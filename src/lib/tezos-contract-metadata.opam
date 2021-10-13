@@ -6,12 +6,22 @@ bug-reports: "https://github.com/oxheadalpha/tezos-contract-metadata/issues"
 dev-repo: "git+https://github.com/oxheadalpha/tezos-contract-metadata.git"
 license: "MIT"
 depends: [
+  "base"
+  "base58"
+  "digestif" { = "0.9.0" }
+  "lwd"
+  "lwt"
+  "cohttp-lwt-unix"
   "tezos-tooling" { with-test }
   "dune" { >= "1.11" }
   "tezos-micheline"
   "cohttp"
   "fmt"
 ]
+pin-depends: [
+  [ "lwd.version" "git+https://github.com/let-def/lwd.git#3bfeca4d37560f8778610c51d60d2d1aedfa519d" ]
+  [ "base58.version" "git+https://github.com/vbmithr/ocaml-base58.git#45be492472b74fe34b1479fb391e83bf62f0e823" ]
+]  
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
