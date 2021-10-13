@@ -150,6 +150,7 @@ module Uri = struct
     resolve uri
     *)
 end
+
 module Content = struct
   let of_json s =
     try
@@ -849,7 +850,7 @@ module Token = struct
           ; is_operator
           ; permissions_descriptor
           ; token_metadata
-          ; _(* FIXME: this is for token_metdata_big_map, but I don't know if that's the right thing to do*)
+          ; _(* FIXME: this is for token_metadata_big_map, but I don't know if that's the right thing to do*)
            } ->
           (total_supply, token_metadata) in
     let get_token_metadata_map_with_view () =
