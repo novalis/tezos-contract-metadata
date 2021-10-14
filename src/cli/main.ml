@@ -23,8 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Base 
-open Stdio 
+open Cmdliner
+open Tezos_contract_metadata
+open Tezos_contract_metadata.Import
+open Stdio
 
 (*
 open Protocol
@@ -541,7 +543,7 @@ let all =
 
 *)            
 
-open Cmdliner
+
 
 type text_length = Full | Short
 type output_format = Text of text_length | Json | Raw
@@ -552,6 +554,71 @@ let string_of_output_format fmt =
   | Text Short -> "text:short"
   | Json -> "json"
   | Raw -> "raw"
+
+
+let wrong_fetch src =
+   Contract_metadata.Token.token_fetch ~address:src
+(* this is wrong, because it fetches some particular token -- while that might be useful, it's not quite what we need.  We need the contract metadata *)
+
+let validate_input input_value =
+    match B58_hashes.check_b58_kt1_hash input_value with
+    | _ -> `KT1 input_value
+    | exception _ when String.is_prefix input_value ~prefix:"KT" ->
+        `Error
+          ( input_value
+          , [Tezos_error_monad.Error_monad.failure "Invalid KT1 address"] )
+    | exception _ -> (
+      match Tezos_contract_metadata.Contract_metadata.Uri.validate input_value with
+      | Ok uri, _ -> `Uri (input_value, uri)
+      | Error e, _ -> `Error (input_value, e) )
+
+module Context = struct
+  type t = {
+    nodes: Query_nodes.t
+  }
+  let make ~nodes = {nodes}
+end
+(*
+let fetch src log = 
+      let full_input = validate_input src in
+      let logs prefix s = print_endline(prefix ^ " " ^ s) in
+      let open Lwt in 
+      let ctxt = Context.make ~nodes:4 in 
+      match full_input with
+          | `KT1 address -> (
+              Query_nodes.metadata_value ctxt ~address ~key:""
+                ~log:(logs "Getting URI g")
+              >>= fun metadata_uri ->
+              (*  probably don't need 
+              Contract_metadata.Uri.Fetcher.set_current_contract ctxt address ;
+              log result (Import.Message.text "Now going for: " %% Import.Message.inline_code metadata_uri) ;
+              *)
+              Lwt.catch
+                (fun () ->
+                  Contract_metadata.Content.token_metadata_value ctxt ~address
+                    ~key:""
+                    ~log:(logs "Getting Token Metadata")
+                  >>= fun token_metadata -> Lwt.return_some token_metadata )
+                (fun exn ->
+                  log result
+                    ( text "Attempt at getting a %token_metadata big-map failed:"
+                    %% Errors_html.exception_html ctxt exn ) ;
+                  return_none )
+              >>= fun token_metadata_big_map ->
+              match Contract_metadata.Uri.validate metadata_uri with
+              | Ok uri, _ -> on_uri ctxt uri ?token_metadata_big_map
+              | Error error, _ ->
+                  raise
+                    (mkexn
+                       (uri_there_but_wrong ctxt ~uri_string:metadata_uri
+                          ~full_input ~error ) ) )
+          | `Uri (_, uri) ->
+              if Contract_metadata.Uri.needs_context_address uri then
+                Async_work.log result
+                  (bt "This URI requires a context KT1 address …") ;
+              System.slow_step ctxt >>= fun () -> on_uri ctxt uri
+          | `Error (_, el) -> raise (mkexn (Tezos_html.error_trace ctxt el)))
+*)
 
 let show_metadata src format = 
   print_endline (src ^ string_of_output_format format)
@@ -566,7 +633,6 @@ pseudocode, as I understand it:
 3. display
 
 *)
-
 
 
 (* let rec fetch_uri_contents ~current_contract uri =
@@ -629,6 +695,8 @@ pseudocode, as I understand it:
           (Hex.of_string value)
       else return content
  *)
+
+
 
 (* CLI *)
 let metadata_format =

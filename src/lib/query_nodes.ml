@@ -54,73 +54,71 @@ module Node = struct
   let status n = Reactive.get n.status
 
   let rpc_get ctxt node path =
-    let _ = ctxt in 
-    (* let open Lwt in *) (* fixme *)
     let uri = Fmt.str "%s/%s" node.prefix path in
-    let fail msg =
+    let fail_decorated msg =
       Decorate_error.raise
         Message.(
-          t "Calling" %% inline_code "HTTP-GET" %% inline_code path %% t "on node" %% inline_code node.name
-          %% msg) in
-          
-(*
+          text "Calling" %% inline_code "HTTP-GET" %% inline_code path
+          %% text "on node" %% inline_code node.name %% msg) in
+    (* FIXME timeout *)
+    let _ = ctxt in
     let actually_get () =
-        Cohttp_lwt_unix.Client.get (Uri.of_string uri)
-        >>= fun (resp, body) ->
-          match Cohttp.Response.status resp with
-          | `OK ->
-            let content = (Cohttp_lwt.Body.to_string body >>= fun content -> return content) in
-             Rpc_cache.add node.rpc_cache ~rpc:path ~response: content;
-              content
-          | _ ->
-              fail Message.(t "Wrong HTTP status:"  (Cohttp.Response.pp_hum resp)) in
-        *)
-
-    (* wrong, but temporary *)
-    let _ = fail in 
-    let actually_get () = Lwt.return uri in 
-
+      let open Lwt in
+      Cohttp_lwt_unix.Client.get (Uri.of_string uri)
+      >>= fun (resp, body) ->
+      Cohttp_lwt.Body.to_string body
+      >>= fun content ->
+      match Cohttp.Response.status resp with
+      | `OK ->
+          Rpc_cache.add node.rpc_cache ~rpc:path ~response:content ;
+          return content
+      | _ ->
+          let code =
+            resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
+          fail_decorated Message.(Fmt.kstr text "Wrong HTTP status: %d" code)
+    in
     match Rpc_cache.get node.rpc_cache ~rpc:path with
     | _, None -> actually_get ()
     | age, Some _ when Float.(age > 120.) -> actually_get ()
     | _, Some s -> Lwt.return s
 
   let rpc_post ctxt node ~body path =
-    let _ = ctxt in (* fixme *)
     let uri = Fmt.str "%s/%s" node.prefix path in
-    let fail msg =
+    let fail_decorated msg =
       Decorate_error.raise
         Message.(
-          t "Calling" %% inline_code "HTTP-POST" %% inline_code path %% t "on node"
-          %% inline_code node.name %% t "with" %% code_block body %% msg) in
-    (* fixme *)
-    let _ = fail in 
-    Lwt.return uri
-(*
+          text "Calling" %% inline_code "HTTP-POST" %% inline_code path
+          %% text "on node" %% inline_code node.name %% text "with"
+          %% code_block body %% msg) in
     System.with_timeout ctxt
       ~f:
-        Js_of_ocaml_lwt.XmlHttpRequest.(
+        Cohttp_lwt_unix.Client.(
           fun () ->
-            perform ~contents:(`String body) ~content_type:"application/json"
-              (Option.value_exn ~message:"uri-of-string"
-                 (Js_of_ocaml.Url.url_of_string uri) )
-            >>= fun frame ->
-            dbgf "%s %s code: %d" node.prefix path frame.code ;
-            match frame.code with
-            | 200 -> return frame.content
-            | other ->
-                dbgf "CONTENT: %s" frame.content ;
-                fail
+            let headers =
+              Cohttp.Header.of_list [("content_type", "application/json")] in
+            let open Lwt in
+            post ~body:(`String body) ~headers (Uri.of_string uri)
+            >>= fun (resp, body) ->
+            let code =
+              resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
+            dbgf "%s %s code: %d" node.prefix path code ;
+            Cohttp_lwt.Body.to_string body
+            >>= fun body_string ->
+            match code with
+            | 200 -> return body_string
+            | _ ->
+                dbgf "CONTENT: %s" body_string ;
+                fail_decorated
                   Message.(
-                    Fmt.kstr t "failed with with return code %d:" other
+                    Fmt.kstr text "failed with with return code %d:" code
                     %% code_block
                          ( try
-                             Ezjsonm.value_from_string frame.content
+                             Ezjsonm.value_from_string body_string
                              |> Ezjsonm.value_to_string ~minify:false
-                           with _ -> frame.content )))
+                           with _ -> body_string )))
       ~raise:(fun timeout ->
-        fail Message.(Fmt.kstr t "timeouted (%03.f seconds)." timeout) )
-   *)
+        fail_decorated
+          Message.(Fmt.kstr text "timed out after %0.3f seconds." timeout) )
 
   let ping ctxt node =
     let open Lwt.Infix in
@@ -165,9 +163,7 @@ module Node = struct
     let log fmt = Fmt.kstr log fmt in
     log "Got raw storage: %s" storage_string ;
     let mich_storage = Michelson.micheline_of_json storage_string in
-    log "As concrete: %a"
-      Micheline_helpers.pp_arbitrary_micheline
-      mich_storage ;
+    log "As concrete: %a" Micheline_helpers.pp_arbitrary_micheline mich_storage ;
     Lwt.return ()
     >>= fun () ->
     Fmt.kstr get "/chains/main/blocks/head/context/contracts/%s/script" address
@@ -177,14 +173,13 @@ module Node = struct
       Michelson.micheline_of_json script_string
       |> Tezos_micheline.Micheline.strip_locations
       |> Micheline_helpers.get_storage_type_exn in
-    log "Storage type: %a"
-      Micheline_helpers.pp_arbitrary_micheline
+    log "Storage type: %a" Micheline_helpers.pp_arbitrary_micheline
       mich_storage_type ;
     Lwt.return ()
     >>= fun () ->
     let bgs =
-      Micheline_helpers.find_metadata_big_maps
-        ~storage_node:mich_storage ~type_node:mich_storage_type in
+      Micheline_helpers.find_metadata_big_maps ~storage_node:mich_storage
+        ~type_node:mich_storage_type in
     match bgs with
     | [] -> Fmt.failwith "Contract has no valid %%metadata big-map!"
     | _ :: _ :: _ ->
@@ -205,9 +200,10 @@ module Node = struct
     Decorate_error.(
       reraise
         Message.(
-          t "Cannot find any value in the big-map"
+          text "Cannot find any value in the big-map"
           %% inline_code (Z.to_string big_map_id)
-          %% t "at the key" %% inline_code key %% t "(hash: " % inline_code hash_string % t ").")
+          %% text "at the key" %% inline_code key %% text "(hash: "
+          % inline_code hash_string % text ").")
         ~f:(fun () ->
           Fmt.kstr (rpc_get ctxt node)
             "/chains/main/blocks/head/context/big_maps/%s/%s"
@@ -217,8 +213,8 @@ module Node = struct
       (ellipsize_string bytes_raw_value ~max_length:30) ;
     let content =
       match Ezjsonm.value_from_string bytes_raw_value with
-         | `O [("bytes", `String b)] -> Hex.to_string (`Hex b)
-         | _ -> Fmt.failwith "Cannot find bytes in %s" bytes_raw_value in
+      | `O [("bytes", `String b)] -> Hex.to_string (`Hex b)
+      | _ -> Fmt.failwith "Cannot find bytes in %s" bytes_raw_value in
     return content
 
   let micheline_value_of_big_map_at_nat ctxt node ~big_map_id ~key ~log =
@@ -227,10 +223,10 @@ module Node = struct
     Decorate_error.(
       reraise
         Message.(
-          t "Cannot find any value in the big-map"
+          text "Cannot find any value in the big-map"
           %% inline_code (Z.to_string big_map_id)
-          %% t "at the key" %% int inline_code key %% t "(hash: " % inline_code hash_string
-          % t ").")
+          %% text "at the key" %% int inline_code key %% text "(hash: "
+          % inline_code hash_string % text ").")
         ~f:(fun () ->
           Fmt.kstr (rpc_get ctxt node)
             "/chains/main/blocks/head/context/big_maps/%s/%s"
@@ -354,7 +350,9 @@ let find_node_with_contract ctxt addr =
       >>= fun node -> Lwt.return node )
     (fun _ ->
       Decorate_error.raise ~trace:(List.rev !trace)
-        Message.(t "Cannot find a node that knows about address" %% inline_code addr) )
+        Message.(
+          text "Cannot find a node that knows about address" %% inline_code addr)
+      )
 
 let metadata_value ctxt ~address ~key ~(log : string -> unit) =
   let open Lwt in
@@ -370,17 +368,15 @@ let metadata_value ctxt ~address ~key ~(log : string -> unit) =
 
 let call_off_chain_view ctxt ~log ~address ~view ~parameter =
   let open Lwt in
-  let open
-    Metadata_contents.View.Implementation
-    .Michelson_storage in
+  let open Metadata_contents.View.Implementation.Michelson_storage in
   let logf f =
     Fmt.kstr
       (fun s ->
         log s ;
         dbgf "call_off_chain_view: %s" s )
       f in
-  logf "Calling %s(%a)" address
-    Micheline_helpers.pp_arbitrary_micheline parameter ;
+  logf "Calling %s(%a)" address Micheline_helpers.pp_arbitrary_micheline
+    parameter ;
   find_node_with_contract ctxt address
   >>= fun node ->
   logf "Found contract with node %S" node.name ;
@@ -398,7 +394,7 @@ let call_off_chain_view ctxt ~log ~address ~view ~parameter =
     | None ->
         Decorate_error.raise
           Message.(
-            t "Cannot understand answer from “protocols” RPC:"
+            text "Cannot understand answer from “protocols” RPC:"
             %% code_block protocols)
     | Some p when String.is_prefix p ~prefix:"PsCARTHA" -> (`Carthage, p)
     | Some p when String.is_prefix p ~prefix:"PsDELPH1" -> (`Delphi, p)
@@ -460,13 +456,11 @@ let call_off_chain_view ctxt ~log ~address ~view ~parameter =
     build_off_chain_view_contract view ~contract_balance:(Z.of_string balance)
       ~contract_address:address ~contract_storage ~view_parameters
       ~contract_storage_type ~contract_parameter_type in
-  logf "Made the view-script: %a"
-    Micheline_helpers.pp_arbitrary_micheline
+  logf "Made the view-script: %a" Micheline_helpers.pp_arbitrary_micheline
     view_contract ;
-  logf "Made the view-input: %a"
-    Micheline_helpers.pp_arbitrary_micheline view_input ;
-  logf "Made the view-storage: %a"
-    Micheline_helpers.pp_arbitrary_micheline
+  logf "Made the view-input: %a" Micheline_helpers.pp_arbitrary_micheline
+    view_input ;
+  logf "Made the view-storage: %a" Micheline_helpers.pp_arbitrary_micheline
     view_storage ;
   let constructed =
     let michjson which mich =
@@ -510,6 +504,5 @@ let call_off_chain_view ctxt ~log ~address ~view ~parameter =
     | Prim (_, "Some", [s], _) -> s
     | other ->
         Fmt.failwith "Result is not (Some _): %a"
-          Micheline_helpers.pp_arbitrary_micheline other
-  in
+          Micheline_helpers.pp_arbitrary_micheline other in
   return (Ok (actual_result, contract_storage))

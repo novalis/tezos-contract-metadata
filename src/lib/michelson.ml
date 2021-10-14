@@ -134,7 +134,9 @@ module Partial_type = struct
         Decorate_error.(
           raise
             Message.(
-              t "Type mismatch" %% inline_code (mich_node other) %% t "is not a pair."))
+              text "Type mismatch"
+              %% inline_code (mich_node other)
+              %% text "is not a pair."))
 
   let fill_with_value mf node = fill_structure_with_value mf.structure node
 
@@ -175,7 +177,6 @@ module Partial_type = struct
           map2 ~f:( && ) (validate_structure left) (validate_structure right))
 
   let is_valid pt = validate_structure pt.structure
-
 
   let bytes_guesses input =
     try
@@ -240,17 +241,16 @@ module Partial_type = struct
                 | other ->
                     nope
                       Message.(
-                        t "Michelson-map element has wrong structure:"
+                        text "Michelson-map element has wrong structure:"
                         %% inline_code (micheline_node_to_string other)) )
       | other ->
           nope
             Message.(
-              t "Metadata result has wrong structure:"
+              text "Metadata result has wrong structure:"
               %% inline_code (micheline_node_to_string (Seq (l, other)))) )
     | other ->
         nope
           Message.(
-            t "Expecting Michelson-map but got"
-            %% inline_code (micheline_node_to_string other)) 
-
+            text "Expecting Michelson-map but got"
+            %% inline_code (micheline_node_to_string other))
 end

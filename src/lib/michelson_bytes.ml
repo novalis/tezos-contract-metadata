@@ -156,15 +156,15 @@ module Hex_reimplementation = struct
       | _ ->
           Decorate_error.raise
             Message.(
-              t "Character “"
+              text "Character “"
               % inline_code (Char.escaped c)
-              % t "”"
+              % text "”"
               %% parens
                    ( int inline_code (Char.code c)
-                   % t ", "
+                   % text ", "
                    %% Fmt.kstr inline_code "0x%02x" (Char.code c) )
-              %% t "at position" %% int inline_code pos
-              %% t "is not valid Hexadecimal encoding.") in
+              %% text "at position" %% int inline_code pos
+              %% text "is not valid Hexadecimal encoding.") in
     Char.chr ((code position x lsl 4) + code (position + 1) y)
 
   let to_helper ~empty_return ~create ~set (`Hex s) =
@@ -177,8 +177,8 @@ module Hex_reimplementation = struct
         else if j >= n then
           Decorate_error.raise
             Message.(
-              t "Invalid hexadecimal string: length should be even, not"
-              %% int inline_code n % t ".")
+              text "Invalid hexadecimal string: length should be even, not"
+              %% int inline_code n % text ".")
         else (
           set buf (i / 2) (to_char ~position:j s.[i] s.[j]) ;
           aux (j + 1) (j + 2) ) in

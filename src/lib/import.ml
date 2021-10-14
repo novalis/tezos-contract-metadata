@@ -1,3 +1,27 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2021 TQ Tezos <contact@tqtezos.com>                         *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 include Base
 
 let dbg fmt = Fmt.pf Fmt.stdout "@[tzcomet-debug: %a@]%!" fmt ()
@@ -97,15 +121,15 @@ module Message = struct
     | Code_block of string
     | List of t list
 
-  let t s = Text s
+  let text s = Text s
   let int f i : t = f (Int.to_string_hum ~delimiter:'_' i)
   let kpp f pp x : t = Fmt.kstr f "%a" pp x
   let inline_code s = Inline_code s
   let code_block s = Code_block s
   let list l = List l
   let ( % ) a b = List [a; b]
-  let ( %% ) a b = List [a; t " "; b]
-  let parens tt = list [t "("; tt; t ")"]
+  let ( %% ) a b = List [a; text " "; b]
+  let parens tt = list [text "("; tt; text ")"]
 
   let rec pp ppf =
     let open Fmt in
@@ -153,12 +177,10 @@ module System = struct
   let http_timeout_bidirectional c =
     Reactive.Bidirectional.of_var (get c).http_timeout
 
-  let with_timeout ctxt ~f ~raise:_ =
-    (*let open Lwt.Infix in*)
+  let with_timeout ctxt ~f ~raise =
+    let open Lwt.Infix in
     let timeout = http_timeout_peek ctxt in
-    let _ = timeout in
-    f ()
-    (** FIXME deleted implementation because it required some js complexity -- we can probably get this from cohttp*)
+    Lwt.pick [f (); (Lwt_unix.sleep timeout >>= fun () -> raise timeout)]
 
   let now () = Unix.gettimeofday () /. 1000.
   let time_zero = now ()
@@ -227,8 +249,7 @@ module Ezjsonm = struct
           | `In_object (None, l) :: _ ->
               pop () ;
               stack_value (`O (List.rev l))
-          | _ ->
-              fail_stack "wrong stack, expecting in-object to close object" )
+          | _ -> fail_stack "wrong stack, expecting in-object to close object" )
         | `As -> stack := `In_array [] :: !stack
         | `Ae -> (
           match !stack with
@@ -240,8 +261,7 @@ module Ezjsonm = struct
           match !stack with
           | `In_object (None, l) :: more ->
               stack := `In_object (Some n, l) :: more
-          | _ ->
-              fail_stack "wrong stack, expecting in-object for field-name" )
+          | _ -> fail_stack "wrong stack, expecting in-object for field-name" )
         | (`Bool _ | `Null | `Float _ | `String _) as v -> stack_value v ) ;
         match !stack with
         | `In_array _ :: _ | `In_object _ :: _ -> go ()
@@ -303,12 +323,12 @@ module Ezjsonm = struct
               else
                 let b = Buffer.create 4 in
                 Uutf.Buffer.add_utf_8 b u ;
-                Fmt.kstr t "“%s” (=" (Buffer.contents b)
+                Fmt.kstr text "“%s” (=" (Buffer.contents b)
                 %% control_char (Uchar.to_int u)
-                % t ")" in
+                % text ")" in
             let err_message =
               let pp = Fmt.kstr in
-              let ppf = t in
+              let ppf = text in
               match err with
               | `Illegal_BOM ->
                   pp ppf
@@ -317,53 +337,60 @@ module Ezjsonm = struct
                   pp ppf "Illegal escape:"
                   %%
                   match r with
-                  | `Not_hex_uchar u -> uchar u %% t "is not a hex-digit"
+                  | `Not_hex_uchar u -> uchar u %% text "is not a hex-digit"
                   | `Not_esc_uchar u ->
-                      uchar u %% t "is not an escape character"
+                      uchar u %% text "is not an escape character"
                   | `Lone_lo_surrogate p ->
-                      control_char p %% t "lone low surrogate"
+                      control_char p %% text "lone low surrogate"
                   | `Lone_hi_surrogate p ->
-                      control_char p %% t "lone high surrogate"
+                      control_char p %% text "lone high surrogate"
                   | `Not_lo_surrogate p ->
-                      control_char p %% t "not a low surrogate" )
+                      control_char p %% text "not a low surrogate" )
               | `Illegal_string_uchar u ->
-                  t "Illegal character in JSON string:" %% uchar u
+                  text "Illegal character in JSON string:" %% uchar u
               | `Illegal_bytes bs ->
                   let l = String.length bs in
                   let (`Hex hx) = Hex.of_string bs in
-                  t "Illegal bytes in character stream ("
-                  % Fmt.kstr inline_code "0x%s" hx % t ", length:" %% int inline_code l % t ")"
-              | `Illegal_number n -> t "Illegal number:" %% inline_code n
-              | `Illegal_literal l -> t "Illegal literal:" %% inline_code l
+                  text "Illegal bytes in character stream ("
+                  % Fmt.kstr inline_code "0x%s" hx
+                  % text ", length:" %% int inline_code l % text ")"
+              | `Illegal_number n -> text "Illegal number:" %% inline_code n
+              | `Illegal_literal l -> text "Illegal literal:" %% inline_code l
               | `Unclosed r -> (
-                  t "Unclosed"
+                  text "Unclosed"
                   %%
                   match r with
-                  | `As -> t "array"
-                  | `Os -> t "object"
-                  | `String -> t "string"
-                  | `Comment -> t "comment" )
+                  | `As -> text "array"
+                  | `Os -> text "object"
+                  | `String -> text "string"
+                  | `Comment -> text "comment" )
               | `Expected r -> (
-                  let value_sep = t "value separator" %% parens (inline_code ",") in
-                  let tor = t "or" in
-                  let array_end = t "end of array" %% parens (inline_code "]") in
-                  let object_end = t "end of object" %% parens (inline_code "}") in
-                  let field_name = t "field name" %% parens (inline_code "\"…\"") in
-                  t "Expected "
+                  let value_sep =
+                    text "value separator" %% parens (inline_code ",") in
+                  let tor = text "or" in
+                  let array_end =
+                    text "end of array" %% parens (inline_code "]") in
+                  let object_end =
+                    text "end of object" %% parens (inline_code "}") in
+                  let field_name =
+                    text "field name" %% parens (inline_code "\"…\"") in
+                  text "Expected "
                   %%
                   match r with
-                  | `Comment -> t "JavaScript comment"
-                  | `Value -> t "JSON value"
+                  | `Comment -> text "JavaScript comment"
+                  | `Value -> text "JSON value"
                   | `Name -> field_name
-                  | `Name_sep -> t "field-name separator" %% parens (inline_code ":")
-                  | `Aval true -> t "JSON-value" %% tor %% array_end
+                  | `Name_sep ->
+                      text "field-name separator" %% parens (inline_code ":")
+                  | `Aval true -> text "JSON-value" %% tor %% array_end
                   | `Aval false -> value_sep %% tor %% array_end
                   | `Omem true -> field_name %% tor %% object_end
                   | `Omem false -> value_sep %% tor %% object_end
-                  | `Json -> t "JSON value"
-                  | `Eoi -> t "end of input" ) in
-            t "JSON Parsing: at line" %% int inline_code line %% t ", column"
-            %% int inline_code col % t ":" %% err_message % t ".")
+                  | `Json -> text "JSON value"
+                  | `Eoi -> text "end of input" ) in
+            text "JSON Parsing: at line"
+            %% int inline_code line %% text ", column" %% int inline_code col
+            % text ":" %% err_message % text ".")
     | exception e -> Fmt.failwith "JSON Parising error: exception %a" Exn.pp e
 end
 

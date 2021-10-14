@@ -107,11 +107,12 @@ let crypto_test () =
       let (`Hex hx) = Hex.of_string b in
       Fmt.pf ppf "0x%s" hx in
     dbgf "bytes: %a" ppb bytes ;
-  
-    let dgst x = Digestif.to_raw_string blake2b32 (Digestif.digest_string blake2b32 x) in
+    let dgst x =
+      Digestif.to_raw_string blake2b32 (Digestif.digest_string blake2b32 x)
+    in
     let b58 s = Base58.to_string (Base58.of_bytes (module B58_crypto) s) in
     (* FIXME *)
-    let bogus_raw_encode (some_bytes: string) = some_bytes in 
+    let bogus_raw_encode (some_bytes : string) = some_bytes in
     dbgf "digest raw: %a -> %s (%s)" ppb (dgst bytes)
       (b58 (dgst bytes))
       (bogus_raw_encode (dgst bytes)) ;
@@ -121,7 +122,6 @@ let crypto_test () =
       (bogus_raw_encode (dgst with05)) ;
     dbgf "digest-pfx: %a → %s" ppb (dgst with05)
       (b58 (script_expr_hash ^ dgst with05)) in
-
   michelson_string_expr_hash "" ;
   michelson_string_expr_hash "foo" ;
   ()
