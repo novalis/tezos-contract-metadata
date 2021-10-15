@@ -80,24 +80,30 @@ let b58_script_id_hash_of_michelson_string s =
 let b58_script_id_hash_of_michelson_int s =
   b58_script_id_hash ("\x05" ^ Michelson_bytes.encode_michelson_int s)
 
-let crypto_test () =
-  let dbg fmt = Fmt.pf Fmt.stderr "@[tzcomet-debug: %a@]%!\n" fmt () in
-  let dbgf fmt = Fmt.(kstr (fun s -> dbg (const string s))) fmt in
-  dbgf "TRYING BLAKE2B: %s"
-    (let dgst = Digestif.digest_string (Digestif.blake2b 32) "" in
-     Digestif.to_hex (Digestif.blake2b 32) dgst ) ;
-  dbgf "TRYING base58: %a %S"
-    Fmt.(Dump.option Base58.pp)
-    (Base58.of_string
-       (module B58_crypto)
-       "expru5X1yxJG6ezR2uHMotwMLNmSzQyh5t1vUnhjx4cS6Pv9qE1Sdo" )
-    ( Base58.of_string_exn
-        (module B58_crypto)
-        "expru5X1yxJG6ezR2uHMotwMLNmSzQyh5t1vUnhjx4cS6Pv9qE1Sdo"
+let%test "Blake2B" =
+  let expect =
+    "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8" in
+  let dgst = Digestif.digest_string (Digestif.blake2b 32) "" in
+  let actual = Digestif.to_hex (Digestif.blake2b 32) dgst in
+  String.equal expect actual
+
+let%test "Base58" =
+  let expect =
+    "0d2c401b4a1cf11667fa0165eac9963333b883a80bcfdfebde09b79bfc740680e986bab6"
+  in
+  let actual =
+    Base58.of_string_exn
+      (module B58_crypto)
+      "expru5X1yxJG6ezR2uHMotwMLNmSzQyh5t1vUnhjx4cS6Pv9qE1Sdo"
     |> Base58.to_bytes (module B58_crypto)
     |> Option.value_map ~default:"EEEERRRROR" ~f:(fun x ->
            let (`Hex h) = Hex.of_string x in
-           h ) ) ;
+           h ) in
+  String.equal expect actual
+
+let crypto_test () =
+  let dbg fmt = Fmt.pf Fmt.stderr "@[tzcomet-debug: %a@]%!\n" fmt () in
+  let dbgf fmt = Fmt.(kstr (fun s -> dbg (const string s))) fmt in
   let michelson_string_expr_hash s =
     dbgf "mseh: %S" s ;
     let bytes = Michelson_bytes.encode_michelson_string s in
@@ -109,7 +115,7 @@ let crypto_test () =
       Digestif.to_raw_string blake2b32 (Digestif.digest_string blake2b32 x)
     in
     let b58 s = Base58.to_string (Base58.of_bytes (module B58_crypto) s) in
-    (* FIXME *)
+    (* TODO: this is supposed to be Base58.raw_encode but that is not exposed yet *)
     let bogus_raw_encode (some_bytes : string) = some_bytes in
     dbgf "digest raw: %a -> %s (%s)" ppb (dgst bytes)
       (b58 (dgst bytes))

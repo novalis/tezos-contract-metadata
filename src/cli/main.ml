@@ -130,17 +130,13 @@ let fetch_contract_metadata log log_exn src =
   | `Error (_, _) -> fail_with "wrong type?"
 (*raise (mkexn (Tezos_html.error_trace ctxt el))*)
 
-(*
-let show_metadata src format =
-  print_endline (src ^ string_of_output_format format)
-   delete me *)
-
 let log_exn prefix exn =
   let _ = exn in
   (* fixme *)
   print_endline prefix
 
 let show_metadata src format =
+  B58_hashes.crypto_test () ;
   let _ = format in
   (* fixme *)
   let open Lwt.Infix in

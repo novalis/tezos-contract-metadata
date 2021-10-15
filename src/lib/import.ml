@@ -26,7 +26,7 @@
 (* fixme this makes compilation slower *)
 include Base
 
-let dbg out fmt = Fmt.pf out "@[tzcomet-debug: %a@]%!\n" fmt ()
+let dbg out fmt = Fmt.pf out "@[tezos-contract-metadata-debug: %a@]%!\n" fmt ()
 let dbgf out fmt = Fmt.(kstr (fun s -> dbg out (const string s))) fmt
 
 let rec oxfordize_list l ~map ~sep ~last_sep =
