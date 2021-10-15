@@ -52,13 +52,15 @@ let validate_address input_value =
     | Ok uri, _ -> `Uri (input_value, uri)
     | Error e, _ -> `Error (input_value, e) )
 
-let on_uri ctxt logs ?token_metadata_big_map uri =
-  (* fixme This parameter is confusing *)
+let on_uri ctxt logs ?token_metadata_big_map uri ~address =
+  (* fixme Not sure what to do with token_metadata_big_map parameter -- it's just a (maybe big) number? *)
   let _ = token_metadata_big_map in
   let open Lwt in
   catch
     (fun () ->
-      Contract_metadata.Uri.fetch ctxt uri ~log:(logs "Fetching Metadata") )
+      Contract_metadata.Uri.fetch ctxt uri
+        ~log:(logs "Fetching Metadata %s")
+        ~current_contract:address )
     (fun e -> raise (Exn.reraise e "Failed to fetch metadata"))
   >>= fun json_code ->
   dbgf ctxt#formatter "before of-json" ;
@@ -89,7 +91,6 @@ let fetch_contract_metadata ctxt log log_exn src =
       Query_nodes.metadata_value ctxt ~address ~key:""
         ~log:(logs "Getting URI g")
       >>= fun metadata_uri ->
-      Contract_metadata.Uri.Fetcher.set_current_contract ctxt address ;
       Lwt.catch
         (fun () ->
           Contract_metadata.Content.token_metadata_value ctxt ~address
@@ -101,7 +102,8 @@ let fetch_contract_metadata ctxt log log_exn src =
           return_none )
       >>= fun token_metadata_big_map ->
       match Contract_metadata.Uri.validate metadata_uri with
-      | Ok uri, _ -> on_uri ctxt logs uri ?token_metadata_big_map
+      | Ok uri, _ ->
+          on_uri ctxt logs uri ?token_metadata_big_map ~address:(Some address)
       | Error _, _ -> fail_with "FIXME wrong uri "
       (* fixme
                     (mkexn
@@ -111,7 +113,7 @@ let fetch_contract_metadata ctxt log log_exn src =
   | `Uri (_, uri) ->
       if Contract_metadata.Uri.needs_context_address uri then
         log "This URI requires a context KT1 address …" ;
-      on_uri ctxt logs uri
+      on_uri ctxt logs uri ~address:None
   | `Error (_, _) -> fail_with "wrong type?"
 (* fixme raise (mkexn (Tezos_html.error_trace ctxt el))*)
 

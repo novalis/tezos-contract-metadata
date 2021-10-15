@@ -27,13 +27,9 @@ open Import
 module Uri : sig
   module Fetcher : sig
     type gateway = {main: string; alternate: string}
-    type t = {current_contract: string option Reactive.var; gateway: gateway}
+    type t = {gateway: gateway}
 
     val create : unit -> t
-
-    (* fixme remove *)
-    val set_current_contract : < fetcher: t ; .. > -> string -> unit
-    val unset_current_contract : < fetcher: t ; .. > -> unit
   end
 
   val fetch :
@@ -45,6 +41,7 @@ module Uri : sig
        ; formatter: Caml.Format.formatter
        ; .. >
     -> Metadata_uri.t
+    -> current_contract:string option
     -> string Lwt.t
 
   val validate :

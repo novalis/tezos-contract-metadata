@@ -25,22 +25,15 @@ module Uri = struct
 
   module Fetcher = struct
     type gateway = {main: string; alternate: string}
-    type t = {current_contract: string option Reactive.var; gateway: gateway}
+    type t = {gateway: gateway}
 
     let create () =
       let main = "https://gateway.ipfs.io/ipfs/" in
       let alternate = "https://dweb.link/ipfs/" in
-      {current_contract= Reactive.var None; gateway= {main; alternate}}
+      {gateway= {main; alternate}}
 
     let get (ctxt : < fetcher: t ; .. > Context.t) = ctxt#fetcher
-    let current_contract ctxt = (get ctxt).current_contract
     let gateway ctxt = (get ctxt).gateway
-
-    let set_current_contract ctxt s =
-      Reactive.set (get ctxt).current_contract (Some s)
-
-    let unset_current_contract ctxt =
-      Reactive.set (get ctxt).current_contract None
   end
 
   let rec needs_context_address =
@@ -83,7 +76,7 @@ module Uri = struct
                  (Cohttp.Response.sexp_of_t resp |> Sexp.to_string_hum) )
             >>= fun content -> Lwt.return content )
 
-  let fetch ?limit_bytes ?log ctxt uri =
+  let fetch ?limit_bytes ?log ctxt uri ~current_contract =
     let log =
       match log with
       | None -> dbgf ctxt#formatter "Uri.fetch.log: %s"
@@ -119,8 +112,7 @@ module Uri = struct
             match address with
             | Some s -> s
             | None -> (
-              (* FIXME YOU ARE HERE: DELETE REACTIVE? *)
-              match Reactive.peek (Fetcher.current_contract ctxt) with
+              match current_contract with
               | None -> Fmt.failwith "Missing current contract"
               | Some s -> s ) in
           logf "Using address %S (key = %S)" addr key ;
@@ -801,7 +793,6 @@ module Token = struct
     let failm msg =
       Decorate_error.raise
         Message.(Fmt.kstr text "Fetching %s/%d:" address id %% msg) in
-    Uri.Fetcher.set_current_contract ctxt address ;
     Lwt.catch
       (fun () ->
         Content.token_metadata_value ctxt ~address
@@ -818,7 +809,8 @@ module Token = struct
           let empty () = Lwt.return (make []) in
           match Uri.validate metadata_uri with
           | Ok uri, _ -> (
-              Uri.fetch ctxt uri ~log:(logs "Fetching Metadata")
+              Uri.fetch ctxt uri ~current_contract:None
+                ~log:(logs "Fetching Metadata")
               >>= fun json_code ->
               match Content.of_json json_code with
               | Ok (_, con) -> Lwt.return con
@@ -913,7 +905,8 @@ module Token = struct
             | Ok uri, _ ->
                 Lwt.catch
                   (fun () ->
-                    Uri.fetch ctxt uri ~log:(fun s ->
+                    Uri.fetch ctxt uri ~current_contract:(Some address)
+                      ~log:(fun s ->
                         Fmt.kstr meta_log "At %s ‣ %s"
                           (ellipsize_string u ~max_length:16 ~ellipsis:"…")
                           s )
