@@ -84,7 +84,7 @@ module Uri = struct
     let open Lwt.Infix in
     let logf fmt = Fmt.kstr (fun s -> log s) fmt in
     let not_implemented s = Fmt.failwith "Not Implemented: %s" s in
-    dbgf ctxt#formatter "FETCCHINGG ============== " ;
+    dbgf ctxt#formatter "Fetching ============== " ;
     let rec resolve =
       let open Metadata_uri in
       function

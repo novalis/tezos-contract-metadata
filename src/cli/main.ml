@@ -81,7 +81,8 @@ let on_uri ctxt ?token_metadata_big_map uri ~address =
       (*return None *)
       fail_with "this error"
 
-let fetch_contract_metadata ctxt log log_exn src =
+let fetch_contract_metadata ctxt log_exn src =
+  let log = dbgf ctxt#formatter "%s" in
   let full_input = validate_address src in
   let logs prefix s = log (prefix ^ " " ^ s) in
   let open Lwt in
@@ -116,11 +117,6 @@ let fetch_contract_metadata ctxt log log_exn src =
   | `Error (_, _) -> fail_with "wrong type?"
 (* fixme raise (mkexn (Tezos_html.error_trace ctxt el))*)
 
-let log_exn prefix exn =
-  let _ = exn in
-  (* fixme *)
-  print_endline prefix
-
 let show_metadata src format debug =
   let ctxt =
     let system = System.create () in
@@ -132,9 +128,11 @@ let show_metadata src format debug =
       method fetcher = fetcher
       method formatter = if debug then Fmt.stderr else Caml.Format.str_formatter
     end in
+  let log_exn prefix exn =
+    dbgf ctxt#formatter "%s: %s" prefix (Exn.to_string exn) in
   let open Lwt.Infix in
   Lwt_main.run
-    ( fetch_contract_metadata ctxt print_endline log_exn src
+    ( fetch_contract_metadata ctxt log_exn src
     >>= fun result ->
     ( match result with
     | None -> print_endline "wrong"
