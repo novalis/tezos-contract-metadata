@@ -88,7 +88,7 @@ module Uri = struct
           dbgf ctxt#formatter "Uri.fetch: %s" s ;
           log s )
         fmt in
-    let ni s = Fmt.failwith "Not Implemented: %s" s in
+    let not_implemented s = Fmt.failwith "Not Implemented: %s" s in
     dbgf ctxt#formatter "FETCCHINGG ============== " ;
     let rec resolve =
       let open Metadata_uri in
@@ -119,7 +119,7 @@ module Uri = struct
           Query_nodes.metadata_value ctxt ~address:addr ~key ~log
       | Storage {network= Some network; address; key} ->
           logf "storage %s %a %S" network Fmt.Dump.(option string) address key ;
-          Fmt.kstr ni "storage uri with network = %s" network
+          Fmt.kstr not_implemented "storage uri with network = %s" network
       | Hash {kind= `Sha256; value; target} -> (
           let expected =
             match Digestif.of_raw_string_opt Digestif.sha256 value with
