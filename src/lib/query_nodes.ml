@@ -79,27 +79,30 @@ module Node = struct
         Message.(
           text "Calling" %% inline_code "HTTP-GET" %% inline_code path
           %% text "on node" %% inline_code node.name %% msg) in
-    (* FIXME timeout *)
-    let _ = ctxt in
     let actually_get () =
       let open Lwt in
       dbgf ctxt#formatter "get uri %S" uri ;
-      Cohttp_lwt_unix.Client.get (Uri.of_string uri)
-      >>= fun (resp, body) ->
-      Cohttp_lwt.Body.to_string body
-      >>= fun content ->
-      match Cohttp.Response.status resp with
-      | `OK ->
-          dbgf ctxt#formatter "response ok %d"
-            (resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status) ;
-          Rpc_cache.add ctxt node.rpc_cache ~rpc:path ~response:content ;
-          return content
-      | _ ->
-          let code =
-            resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
-          dbgf ctxt#formatter "response bad %d" code ;
-          fail_decorated Message.(Fmt.kstr text "Wrong HTTP status: %d" code)
-    in
+      System.with_timeout ctxt
+        ~raise:(fun timeout ->
+          Fmt.failwith "HTTP Call timed out: %.3f s" timeout )
+        ~f:(fun () ->
+          Cohttp_lwt_unix.Client.get (Uri.of_string uri)
+          >>= fun (resp, body) ->
+          Cohttp_lwt.Body.to_string body
+          >>= fun content ->
+          match Cohttp.Response.status resp with
+          | `OK ->
+              dbgf ctxt#formatter "response ok %d"
+                (resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status) ;
+              Rpc_cache.add ctxt node.rpc_cache ~rpc:path ~response:content ;
+              return content
+          | _ ->
+              let code =
+                resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status
+              in
+              dbgf ctxt#formatter "response bad %d" code ;
+              fail_decorated
+                Message.(Fmt.kstr text "Wrong HTTP status: %d" code) ) in
     match Rpc_cache.get ctxt node.rpc_cache ~rpc:path with
     | _, None -> actually_get ()
     | age, Some _ when Float.(age > 120.) -> actually_get ()

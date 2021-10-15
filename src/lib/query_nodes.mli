@@ -58,7 +58,7 @@ module Node : sig
   end
 
   val micheline_value_of_big_map_at_nat :
-       < formatter: Format.formatter ; .. >
+       < formatter: Format.formatter ; system: System.t ; .. >
     -> t
     -> big_map_id:Z.t
     -> key:int
