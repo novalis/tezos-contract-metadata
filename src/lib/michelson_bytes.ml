@@ -240,5 +240,5 @@ let example () =
     with
     | Data_encoding.Binary.Read_error e ->
         Fmt.str "readerror: %a" Data_encoding.Binary.pp_read_error e
-    | e -> Fmt.str "exn: %a" Exn.pp e in
+    | e -> Fmt.str "exn: %a" Base.Exn.pp e in
   to_display

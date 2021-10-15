@@ -1,3 +1,4 @@
+open! Base
 open Import
 
 module Uri = struct

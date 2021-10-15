@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open! Base
 open Tezos_contract_metadata
 open Tezos_contract_metadata.Import
 open Cmdliner

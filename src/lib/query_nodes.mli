@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Import
+open! Base
+open! Import
 
 module Node_status : sig
   type t = Uninitialized | Non_responsive of exn | Ready of string

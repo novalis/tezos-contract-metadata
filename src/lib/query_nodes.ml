@@ -1,3 +1,4 @@
+open! Base
 open! Import
 
 module Node_status = struct

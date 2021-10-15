@@ -1,3 +1,4 @@
+open! Base
 open! Import
 open Tezos_micheline
 

@@ -1,4 +1,5 @@
-open Import
+open! Base
+open! Import
 
 module B58_crypto = struct
   let sha256 s = Digestif.SHA256.(to_raw_string (digest_string s))

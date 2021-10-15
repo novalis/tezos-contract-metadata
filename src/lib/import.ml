@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* fixme this makes compilation slower *)
-include Base
+open Base
 
 let dbg out fmt = Fmt.pf out "@[tezos-contract-metadata-debug: %a@]%!\n" fmt ()
 let dbgf out fmt = Fmt.(kstr (fun s -> dbg out (const string s))) fmt
