@@ -34,7 +34,7 @@ module Uri : sig
 
   val fetch :
        ?limit_bytes:int
-    -> ?log:(string -> unit)
+    -> ?prefix:string
     -> < fetcher: Fetcher.t
        ; nodes: Query_nodes.Node_list.t
        ; system: System.t
@@ -76,7 +76,7 @@ module Content : sig
   val token_metadata_value :
        < nodes: Query_nodes.Node_list.t
        ; system: System.t
-       ; formatter: Format.formatter
+       ; formatter: Caml.Format.formatter
        ; .. >
     -> address:string
     -> log:(string -> unit)

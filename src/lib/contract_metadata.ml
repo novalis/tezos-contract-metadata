@@ -76,18 +76,13 @@ module Uri = struct
                  (Cohttp.Response.sexp_of_t resp |> Sexp.to_string_hum) )
             >>= fun content -> Lwt.return content )
 
-  let fetch ?limit_bytes ?log ctxt uri ~current_contract =
+  let fetch ?limit_bytes ?prefix ctxt uri ~current_contract =
     let log =
-      match log with
+      match prefix with
       | None -> dbgf ctxt#formatter "Uri.fetch.log: %s"
-      | Some log -> log in
+      | Some prefix -> dbgf ctxt#formatter "%s: %s" prefix in
     let open Lwt.Infix in
-    let logf fmt =
-      Fmt.kstr
-        (fun s ->
-          dbgf ctxt#formatter "Uri.fetch: %s" s ;
-          log s )
-        fmt in
+    let logf fmt = Fmt.kstr (fun s -> log s) fmt in
     let not_implemented s = Fmt.failwith "Not Implemented: %s" s in
     dbgf ctxt#formatter "FETCCHINGG ============== " ;
     let rec resolve =
@@ -810,7 +805,7 @@ module Token = struct
           match Uri.validate metadata_uri with
           | Ok uri, _ -> (
               Uri.fetch ctxt uri ~current_contract:None
-                ~log:(logs "Fetching Metadata")
+                ~prefix:"Fetching Metadata"
               >>= fun json_code ->
               match Content.of_json json_code with
               | Ok (_, con) -> Lwt.return con
@@ -905,11 +900,11 @@ module Token = struct
             | Ok uri, _ ->
                 Lwt.catch
                   (fun () ->
-                    Uri.fetch ctxt uri ~current_contract:(Some address)
-                      ~log:(fun s ->
-                        Fmt.kstr meta_log "At %s ‣ %s"
-                          (ellipsize_string u ~max_length:16 ~ellipsis:"…")
-                          s )
+                    let prefix =
+                      "At "
+                      ^ ellipsize_string u ~max_length:16 ~ellipsis:"…"
+                      ^ " ‣" in
+                    Uri.fetch ctxt uri ~current_contract:(Some address) ~prefix
                     >>= fun s -> Lwt.return_some (u, Ezjsonm.value_from_string s)
                     )
                   (fun exn ->
@@ -950,6 +945,7 @@ module Token = struct
                   List.map l ~f:(fun (k, v) -> Ok (k, f v))
               | Some (_, _) -> [] ) in
           Lwt.return_none
+          (* FIXME: deal with multimedia *)
           (*let multimedia_choice =
               match (tzip21.artifact, tzip21.display, tzip21.thumbnail) with
               | Some a, _, _ -> Some ("Artifact", a)
