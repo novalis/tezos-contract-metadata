@@ -83,11 +83,20 @@ module Uri = struct
                  (Cohttp.Response.sexp_of_t resp |> Sexp.to_string_hum) )
             >>= fun content -> Lwt.return content )
 
-  let fetch ?limit_bytes ?(log = dbgf "Uri.fetch.log: %s") ctxt uri =
+  let fetch ?limit_bytes ?log ctxt uri =
+    let log =
+      match log with
+      | None -> dbgf ctxt#formatter "Uri.fetch.log: %s"
+      | Some log -> log in
     let open Lwt.Infix in
-    let logf fmt = Fmt.kstr (fun s -> dbgf "Uri.fetch: %s" s ; log s) fmt in
+    let logf fmt =
+      Fmt.kstr
+        (fun s ->
+          dbgf ctxt#formatter "Uri.fetch: %s" s ;
+          log s )
+        fmt in
     let ni s = Fmt.failwith "Not Implemented: %s" s in
-    dbgf "FETCCHINGG ============== " ;
+    dbgf ctxt#formatter "FETCCHINGG ============== " ;
     let rec resolve =
       let open Metadata_uri in
       function
@@ -101,7 +110,7 @@ module Uri = struct
           Lwt.catch
             (fun () -> resolve (Web gatewayed))
             (fun e ->
-              dbgf "Trying alternate IPFS gateway..." ;
+              dbgf ctxt#formatter "Trying alternate IPFS gateway..." ;
               let gatewayed_alt =
                 to_ipfs_gateway ctxt ~alt_gateway:true ~cid ~path in
               resolve (Web gatewayed_alt) )

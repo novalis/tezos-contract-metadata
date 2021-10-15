@@ -55,13 +55,10 @@ let check_b58_hash ~prefix ~size s =
     optry
       (fun () -> Base58.of_string (module B58_crypto) s)
       "Cannot decode base58 from %S" s in
-  dbgf "base58: %a" Base58.pp b58 ;
   let data =
     optry
       (fun () -> Base58.to_bytes (module B58_crypto) b58)
       "Cannot get data from base58 %a" Base58.pp b58 in
-  dbgf "data: %a" ppstring data ;
-  dbgf "prefix: %a" ppstring prefix ;
   if not (String.is_prefix data ~prefix) then
     Fmt.failwith "Wrong prefix for data 0x%a, expecting 0x%a" Hex.pp
       (Hex.of_string data) Hex.pp (Hex.of_string prefix) ;
@@ -69,7 +66,6 @@ let check_b58_hash ~prefix ~size s =
     optry
       (fun () -> String.chop_prefix data ~prefix)
       "Wrong refix AGAIN??? %S %S" data prefix in
-  dbgf "hash: %a" ppstring hashpart ;
   optry
     (fun () -> Digestif.of_raw_string_opt (Digestif.blake2b size) hashpart)
     "This is not a blake2b hash: %a" ppstring hashpart
@@ -85,6 +81,8 @@ let b58_script_id_hash_of_michelson_int s =
   b58_script_id_hash ("\x05" ^ Michelson_bytes.encode_michelson_int s)
 
 let crypto_test () =
+  let dbg fmt = Fmt.pf Fmt.stderr "@[tzcomet-debug: %a@]%!\n" fmt () in
+  let dbgf fmt = Fmt.(kstr (fun s -> dbg (const string s))) fmt in
   dbgf "TRYING BLAKE2B: %s"
     (let dgst = Digestif.digest_string (Digestif.blake2b 32) "" in
      Digestif.to_hex (Digestif.blake2b 32) dgst ) ;

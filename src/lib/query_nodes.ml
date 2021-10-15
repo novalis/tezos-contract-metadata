@@ -13,12 +13,12 @@ module Rpc_cache = struct
 
   let create () : t = Hashtbl.create 42
 
-  let add (t : t) ~rpc ~response =
+  let add ctxt (t : t) ~rpc ~response =
     let now = System.program_time () in
-    dbgf "CACHE-ADD: %s (%.0f)" rpc now ;
+    dbgf ctxt#formatter "CACHE-ADD: %s (%.0f)" rpc now ;
     Hashtbl.add t rpc (now, response)
 
-  let get (t : t) ~rpc =
+  let get ctxt (t : t) ~rpc =
     let now = System.program_time () in
     let best_ts = ref 0. in
     let best = ref None in
@@ -29,7 +29,8 @@ module Rpc_cache = struct
       if Float.(ts + 120. < now) then None else Some (ts, v) in
     Hashtbl.filter_map_inplace filter t ;
     let age = now -. !best_ts in
-    dbgf "CACHE-GET:\n %s\n → now: %.0f\n → age: %.0f\n → %s" rpc now age
+    dbgf ctxt#formatter "CACHE-GET:\n %s\n → now: %.0f\n → age: %.0f\n → %s" rpc
+      now age
       (if Option.is_none !best then "MISS" else "HIT") ;
     (age, !best)
 end
@@ -56,25 +57,25 @@ module Node = struct
     let _ = ctxt in
     let actually_get () =
       let open Lwt in
-      dbgf "get uri %S" uri ;
+      dbgf ctxt#formatter "get uri %S" uri ;
       Cohttp_lwt_unix.Client.get (Uri.of_string uri)
       >>= fun (resp, body) ->
-      dbgf "HERE" ;
+      dbgf ctxt#formatter "HERE" ;
       Cohttp_lwt.Body.to_string body
       >>= fun content ->
       match Cohttp.Response.status resp with
       | `OK ->
-          dbgf "response ok %d"
+          dbgf ctxt#formatter "response ok %d"
             (resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status) ;
-          Rpc_cache.add node.rpc_cache ~rpc:path ~response:content ;
+          Rpc_cache.add ctxt node.rpc_cache ~rpc:path ~response:content ;
           return content
       | _ ->
           let code =
             resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
-          dbgf "response bad %d" code ;
+          dbgf ctxt#formatter "response bad %d" code ;
           fail_decorated Message.(Fmt.kstr text "Wrong HTTP status: %d" code)
     in
-    match Rpc_cache.get node.rpc_cache ~rpc:path with
+    match Rpc_cache.get ctxt node.rpc_cache ~rpc:path with
     | _, None -> actually_get ()
     | age, Some _ when Float.(age > 120.) -> actually_get ()
     | _, Some s -> Lwt.return s
@@ -98,13 +99,13 @@ module Node = struct
             >>= fun (resp, body) ->
             let code =
               resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
-            dbgf "%s %s code: %d" node.prefix path code ;
+            dbgf ctxt#formatter "%s %s code: %d" node.prefix path code ;
             Cohttp_lwt.Body.to_string body
             >>= fun body_string ->
             match code with
             | 200 -> return body_string
             | _ ->
-                dbgf "CONTENT: %s" body_string ;
+                dbgf ctxt#formatter "CONTENT: %s" body_string ;
                 fail_decorated
                   Message.(
                     Fmt.kstr text "failed with with return code %d:" code
@@ -303,7 +304,7 @@ let find_node_with_contract ctxt addr =
                 "/chains/main/blocks/head/context/contracts/%s/storage" addr
               >>= fun network -> return_true )
             (fun exn ->
-              dbgf "exn %S" (Exn.to_string exn) ;
+              dbgf ctxt#formatter "exn %S" (Exn.to_string exn) ;
               trace := exn :: !trace ;
               return_false ) )
         (Node_list.nodes ctxt#nodes)
@@ -333,7 +334,7 @@ let call_off_chain_view ctxt ~log ~address ~view ~parameter =
     Fmt.kstr
       (fun s ->
         log s ;
-        dbgf "call_off_chain_view: %s" s )
+        dbgf ctxt#formatter "call_off_chain_view: %s" s )
       f in
   logf "Calling %s(%a)" address Micheline_helpers.pp_arbitrary_micheline
     parameter ;

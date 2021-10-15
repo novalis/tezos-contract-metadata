@@ -22,10 +22,12 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(* fixme this makes compilation slower *)
 include Base
 
-let dbg fmt = Fmt.pf Fmt.stderr "@[tzcomet-debug: %a@]%!\n" fmt ()
-let dbgf fmt = Fmt.(kstr (fun s -> dbg (const string s))) fmt
+let dbg out fmt = Fmt.pf out "@[tzcomet-debug: %a@]%!\n" fmt ()
+let dbgf out fmt = Fmt.(kstr (fun s -> dbg out (const string s))) fmt
 
 let rec oxfordize_list l ~map ~sep ~last_sep =
   match l with
@@ -159,11 +161,7 @@ module System = struct
     {dev_mode= Reactive.var dev_mode; http_timeout= Reactive.var 5.}
 
   let get (state : < system: t ; .. > Context.t) = state#system
-
-  let set_dev_mode c v =
-    dbgf "system: setting dev_mode to %b" v ;
-    Reactive.set (get c).dev_mode v
-
+  let set_dev_mode c v = Reactive.set (get c).dev_mode v
   let dev_mode c = Reactive.get (get c).dev_mode
 
   let dev_mode_bidirectional state =
@@ -310,7 +308,6 @@ module Ezjsonm = struct
     match json_of_src (`String s) with
     | `JSON j -> j
     | `Error (((line, col), (eline, ecol)), err) ->
-        dbgf "Error l-%d c-%d -- l-%d c-%d" line col eline ecol ;
         Decorate_error.raise
           Message.(
             (* Adapted from

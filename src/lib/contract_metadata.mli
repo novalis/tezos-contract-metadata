@@ -42,6 +42,7 @@ module Uri : sig
     -> < fetcher: Fetcher.t
        ; nodes: Query_nodes.Node_list.t
        ; system: System.t
+       ; formatter: Caml.Format.formatter
        ; .. >
     -> Metadata_uri.t
     -> string Lwt.t
@@ -76,7 +77,10 @@ module Content : sig
   end
 
   val token_metadata_value :
-       < nodes: Query_nodes.Node_list.t ; system: System.t ; .. >
+       < nodes: Query_nodes.Node_list.t
+       ; system: System.t
+       ; formatter: Format.formatter
+       ; .. >
     -> address:string
     -> key:'a
     -> log:(string -> unit)
@@ -117,6 +121,7 @@ module Token : sig
        < fetcher: Uri.Fetcher.t
        ; nodes: Query_nodes.Node_list.t
        ; system: System.t
+       ; formatter: Caml.Format.formatter
        ; .. >
     -> address:string
     -> id:int

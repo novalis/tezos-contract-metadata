@@ -33,7 +33,10 @@ let ctxt =
   let nodes = Query_nodes.get_default_nodes () in
   let fetcher = Contract_metadata.Uri.Fetcher.create () in
   object
-    method system = system method nodes = nodes method fetcher = fetcher
+    method system = system
+    method nodes = nodes
+    method fetcher = fetcher
+    method formatter = Fmt.stdout
   end
 
 type text_length = Full | Short
@@ -67,11 +70,9 @@ let on_uri ctxt logs ?token_metadata_big_map uri =
   catch
     (fun () ->
       Contract_metadata.Uri.fetch ctxt uri ~log:(logs "Fetching Metadata") )
-    (fun e ->
-      (* FIXME: failed to fetch url *)
-      raise (Exn.reraise e "Failed to fetch metadata") )
+    (fun e -> raise (Exn.reraise e "Failed to fetch metadata"))
   >>= fun json_code ->
-  dbgf "before of-json\n" ;
+  dbgf ctxt#formatter "before of-json" ;
   match Contract_metadata.Content.of_json json_code with
   | Ok (warnings, contents) ->
       (*
@@ -90,7 +91,7 @@ let on_uri ctxt logs ?token_metadata_big_map uri =
       (*return None *)
       fail_with "this error"
 
-let fetch log log_exn src =
+let fetch_contract_metadata log log_exn src =
   let full_input = validate_address src in
   let logs prefix s = log (prefix ^ " " ^ s) in
   let open Lwt in
@@ -130,7 +131,7 @@ let fetch log log_exn src =
 (*raise (mkexn (Tezos_html.error_trace ctxt el))*)
 
 (*
-let show_metadata src format = 
+let show_metadata src format =
   print_endline (src ^ string_of_output_format format)
    delete me *)
 
@@ -144,24 +145,13 @@ let show_metadata src format =
   (* fixme *)
   let open Lwt.Infix in
   Lwt_main.run
-    ( fetch print_endline log_exn src
+    ( fetch_contract_metadata print_endline log_exn src
     >>= fun result ->
     ( match result with
     | None -> print_endline "wrong"
     | Some (_, contents) ->
         Metadata_contents.pp Caml.Format.std_formatter contents ) ;
     Lwt.return 0 )
-
-(*
-pseudocode, as I understand it: 
-1. fetch (how?)
-
- get_metadata_of_contract cctxt ~contract ~strict:should_validate
-
-2. validate
-3. display
-
-*)
 
 (* CLI *)
 let metadata_format =
@@ -181,8 +171,6 @@ let metadata_format =
 let src =
   let doc = "source" in
   Arg.(required & pos 0 (some string) None & info [] ~docv:"SRC" ~doc)
-
-(* TODO : validate *)
 
 let show_metadata_t = Term.(const show_metadata $ src $ metadata_format)
 
