@@ -28,12 +28,21 @@ module Uri : sig
   module Fetcher : sig
     type gateway = {main: string; alternate: string}
     type t = {current_contract: string option Reactive.var; gateway: gateway}
+
+    val create : unit -> t
+
+    (* fixme remove *)
+    val set_current_contract : < fetcher: t ; .. > -> string -> unit
+    val unset_current_contract : < fetcher: t ; .. > -> unit
   end
 
   val fetch :
        ?limit_bytes:int
     -> ?log:(string -> unit)
-    -> < fetcher: Fetcher.t ; nodes: Query_nodes.t ; system: System.t ; .. >
+    -> < fetcher: Fetcher.t
+       ; nodes: Query_nodes.Node_list.t
+       ; system: System.t
+       ; .. >
     -> Metadata_uri.t
     -> string Lwt.t
 
@@ -41,6 +50,8 @@ module Uri : sig
        string
     -> (Metadata_uri.t, Tezos_error_monad.TzCore.error list) result
        * ([> `Address | `Network] * string * string) list
+
+  val needs_context_address : Metadata_uri.t -> bool
 end
 
 module Content : sig
@@ -63,6 +74,20 @@ module Content : sig
       ; formats: uri_format list option
       ; warnings: Message.t list }
   end
+
+  val token_metadata_value :
+       < nodes: Query_nodes.Node_list.t ; system: System.t ; .. >
+    -> address:string
+    -> key:'a
+    -> log:(string -> unit)
+    -> Z.t Lwt.t
+  (** Return metadata about a token FIXME this docstring doesn't make sense *)
+
+  val of_json :
+       string
+    -> ( [`Fixed_legacy of string * string] list * Metadata_contents.t
+       , Tezos_error_monad.Error_monad.tztrace )
+       result
 end
 
 module Token : sig
@@ -89,7 +114,10 @@ module Token : sig
     ; warnings: (string * warning) list }
 
   val token_fetch :
-       < fetcher: Uri.Fetcher.t ; nodes: Query_nodes.t ; system: System.t ; .. >
+       < fetcher: Uri.Fetcher.t
+       ; nodes: Query_nodes.Node_list.t
+       ; system: System.t
+       ; .. >
     -> address:string
     -> id:int
     -> log:(Message.t -> unit)

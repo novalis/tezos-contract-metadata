@@ -11,6 +11,7 @@ depends: [
   "digestif" { = "0.9.0" }
   "lwd"
   "lwt"
+  "lwt_ssl"
   "cohttp-lwt-unix"
   "tezos-tooling" { with-test }
   "dune" { >= "1.11" }

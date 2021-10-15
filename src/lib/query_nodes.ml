@@ -38,20 +38,12 @@ module Node = struct
   type t =
     { name: string
     ; prefix: string
-    ; status: (float * Node_status.t) Reactive.var
     ; rpc_cache: Rpc_cache.t
     ; network: Network.t
     ; info_url: string option }
 
   let create ~network ?info_url name prefix =
-    { name
-    ; prefix
-    ; status= Reactive.var (0., Uninitialized)
-    ; rpc_cache= Rpc_cache.create ()
-    ; network
-    ; info_url }
-
-  let status n = Reactive.get n.status
+    {name; prefix; rpc_cache= Rpc_cache.create (); network; info_url}
 
   let rpc_get ctxt node path =
     let uri = Fmt.str "%s/%s" node.prefix path in
@@ -64,17 +56,22 @@ module Node = struct
     let _ = ctxt in
     let actually_get () =
       let open Lwt in
+      dbgf "get uri %S" uri ;
       Cohttp_lwt_unix.Client.get (Uri.of_string uri)
       >>= fun (resp, body) ->
+      dbgf "HERE" ;
       Cohttp_lwt.Body.to_string body
       >>= fun content ->
       match Cohttp.Response.status resp with
       | `OK ->
+          dbgf "response ok %d"
+            (resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status) ;
           Rpc_cache.add node.rpc_cache ~rpc:path ~response:content ;
           return content
       | _ ->
           let code =
             resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
+          dbgf "response bad %d" code ;
           fail_decorated Message.(Fmt.kstr text "Wrong HTTP status: %d" code)
     in
     match Rpc_cache.get node.rpc_cache ~rpc:path with
@@ -128,11 +125,11 @@ module Node = struct
         >>= fun metadata -> Lwt.return (Ready metadata) )
       (fun e -> Lwt.return (Non_responsive e))
 
-  let get_storage state_handle node ~address ~log =
+  let get_storage ctxt node ~address ~log =
     Lwt.catch
       (fun () ->
         Fmt.kstr
-          (rpc_post state_handle node
+          (rpc_post ctxt node
              ~body:
                Ezjsonm.(
                  dict [("unparsing_mode", string "Optimized_legacy")]
@@ -141,8 +138,7 @@ module Node = struct
           address )
       (fun _ ->
         log "Node does not handle /normalized" ;
-        Fmt.kstr
-          (rpc_get state_handle node)
+        Fmt.kstr (rpc_get ctxt node)
           "/chains/main/blocks/head/context/contracts/%s/storage" address )
 
   module Contract = struct
@@ -155,11 +151,11 @@ module Node = struct
       {storage_node; type_node; metadata_big_map}
   end
 
-  let metadata_big_map state_handle node ~address ~log =
+  let metadata_big_map ctxt node ~address ~log =
     let open Lwt in
-    get_storage state_handle node ~address ~log
+    get_storage ctxt node ~address ~log
     >>= fun storage_string ->
-    let get = rpc_get state_handle node in
+    let get = rpc_get ctxt node in
     let log fmt = Fmt.kstr log fmt in
     log "Got raw storage: %s" storage_string ;
     let mich_storage = Michelson.micheline_of_json storage_string in
@@ -254,43 +250,17 @@ module Node_list = struct
   let fold_nodes t ~init ~f = List.fold t ~init ~f:(fun p (_, (n, _)) -> f p n)
   let map t ~f = List.map t ~f:(fun (_, (n, _)) -> f n)
   let concat_map t ~f = List.concat_map t ~f:(fun (_, (n, _)) -> f n)
+  let nodes t = map t ~f:(fun x -> x)
 end
 
-type t =
-  { nodes: Node_list.t Reactive.var
-  ; wake_up_call: unit Lwt_condition.t
-  ; loop_started: bool Reactive.var
-  ; loop_interval: float Reactive.var
-  ; loop_status: [`Not_started | `In_progress | `Sleeping] Reactive.var }
+type t = {nodes: Node_list.t}
 
-let create () =
-  { nodes= Reactive.var Node_list.empty
-  ; wake_up_call= Lwt_condition.create ()
-  ; loop_started= Reactive.var false
-  ; loop_interval= Reactive.var 10.
-  ; loop_status= Reactive.var `Not_started }
-
-let get (ctxt : < nodes: t ; .. > Context.t) = ctxt#nodes
-let nodes t = (get t).nodes
-
-let get_nodes t ~map =
-  Reactive.pair ((get t).nodes |> Reactive.get) (System.dev_mode t)
-  |> Reactive.map ~f:(function
-       | l, true -> Node_list.map ~f:map l
-       | l, false -> Node_list.map ~f:map (Node_list.remove_dev l) )
-
-let add_node ?dev ctxt nod =
-  Reactive.set (nodes ctxt)
-    (Node_list.add ?dev (Reactive.peek (nodes ctxt)) nod)
-
-let remove_node ctxt ~name =
-  Reactive.set (nodes ctxt)
-    (Node_list.remove_by_name (Reactive.peek (nodes ctxt)) name)
+let create () = {nodes= Node_list.empty}
 
 (* TODO: move to network.ml *)
 let default_nodes : Node.t list =
   let smartpy = "https://smartpy.io/nodes" in
-  let giga = "https://giganode.io/" in
+  let giga = "https://giganode.io" in
   List.rev
     [ Node.create "Mainnet-SmartPy" "https://mainnet.smartpy.io"
         ~network:`Mainnet ~info_url:smartpy
@@ -299,7 +269,7 @@ let default_nodes : Node.t list =
     ; Node.create "Granadanet-SmartPy" "https://granadanet.smartpy.io"
         ~network:`Granadanet ~info_url:smartpy
     ; Node.create "Florencenet-SmartPy" ~network:`Florencenet
-        "https://florencenet.smartpy.io/" ~info_url:smartpy
+        "https://florencenet.smartpy.io" ~info_url:smartpy
     ; Node.create "Mainnet-GigaNode" "https://mainnet-tezos.giganode.io"
         ~network:`Mainnet ~info_url:giga
     ; Node.create "Edonet-GigaNode" "https://edonet-tezos.giganode.io"
@@ -314,20 +284,11 @@ let dev_nodes =
   List.rev
     [Node.create "Dev:Wrong-node" "http://example.com/nothing" ~network:`Sandbox]
 
-let add_default_nodes ctxt =
-  List.iter ~f:(add_node ~dev:true ctxt) dev_nodes ;
-  List.iter ~f:(add_node ~dev:false ctxt) default_nodes
-
-let loop_interval ctxt = Reactive.peek (get ctxt).loop_interval
-let loop_status ctxt = Reactive.get (get ctxt).loop_status
-let set_loop_status ctxt = Reactive.set (get ctxt).loop_status
-
-let observe_nodes ctxt =
-  let data = get_nodes ~map:Fn.id ctxt in
-  let data_root = Reactive.observe data in
-  let nodes = Reactive.quick_sample data_root in
-  Reactive.quick_release data_root ;
-  nodes
+let get_default_nodes () =
+  let dev =
+    List.fold_left dev_nodes ~init:Node_list.empty ~f:(Node_list.add ~dev:true)
+  in
+  List.fold_left default_nodes ~init:dev ~f:(Node_list.add ~dev:false)
 
 let find_node_with_contract ctxt addr =
   let open Lwt in
@@ -340,13 +301,12 @@ let find_node_with_contract ctxt addr =
             (fun () ->
               Fmt.kstr (Node.rpc_get ctxt node)
                 "/chains/main/blocks/head/context/contracts/%s/storage" addr
-              >>= fun _ ->
-              (*State.set_current_network ctxt node.Node.network ;*)
-              return_true )
+              >>= fun network -> return_true )
             (fun exn ->
+              dbgf "exn %S" (Exn.to_string exn) ;
               trace := exn :: !trace ;
               return_false ) )
-        (observe_nodes ctxt)
+        (Node_list.nodes ctxt#nodes)
       >>= fun node -> Lwt.return node )
     (fun _ ->
       Decorate_error.raise ~trace:(List.rev !trace)

@@ -39,7 +39,6 @@ module Node : sig
   type t =
     { name: string
     ; prefix: string
-    ; status: (float * Node_status.t) Reactive.var
     ; rpc_cache: Rpc_cache.t
     ; network: Network.t
     ; info_url: string option }
@@ -77,25 +76,18 @@ module Node_list : sig
   type t = (string, Node.t * bool) List.Assoc.t
 end
 
-type t =
-  { nodes: Node_list.t Reactive.var
-  ; wake_up_call: unit Lwt_condition.t
-  ; loop_started: bool Reactive.var
-  ; loop_interval: float Reactive.var
-  ; loop_status: [`Not_started | `In_progress | `Sleeping] Reactive.var }
-
 val metadata_value :
-     < nodes: t ; system: System.t ; .. >
+     < nodes: Node_list.t ; system: System.t ; .. >
   -> address:string
   -> key:string
   -> log:(string -> unit)
   -> string Lwt.t
 
 val find_node_with_contract :
-  < nodes: t ; system: System.t ; .. > -> string -> Node.t Lwt.t
+  < nodes: Node_list.t ; system: System.t ; .. > -> string -> Node.t Lwt.t
 
 val call_off_chain_view :
-     < nodes: t ; system: System.t ; .. >
+     < nodes: Node_list.t ; system: System.t ; .. >
   -> log:(string -> unit)
   -> address:string
   -> view:Metadata_contents.View.Implementation.Michelson_storage.t
@@ -105,3 +97,5 @@ val call_off_chain_view :
      , 'b )
      result
      Lwt.t
+
+val get_default_nodes : unit -> Node_list.t

@@ -110,6 +110,7 @@ module Uri = struct
             match address with
             | Some s -> s
             | None -> (
+              (* FIXME YOU ARE HERE: DELETE REACTIVE? *)
               match Reactive.peek (Fetcher.current_contract ctxt) with
               | None -> Fmt.failwith "Missing current contract"
               | Some s -> s ) in
