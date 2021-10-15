@@ -28,17 +28,6 @@ open Tezos_contract_metadata.Import
 open Cmdliner
 open Stdio
 
-let ctxt =
-  let system = System.create () in
-  let nodes = Query_nodes.get_default_nodes () in
-  let fetcher = Contract_metadata.Uri.Fetcher.create () in
-  object
-    method system = system
-    method nodes = nodes
-    method fetcher = fetcher
-    method formatter = Fmt.stdout
-  end
-
 type text_length = Full | Short
 type output_format = Text of text_length | Json | Raw
 
@@ -64,8 +53,8 @@ let validate_address input_value =
     | Error e, _ -> `Error (input_value, e) )
 
 let on_uri ctxt logs ?token_metadata_big_map uri =
+  (* fixme This parameter is confusing *)
   let _ = token_metadata_big_map in
-  (*fixme *)
   let open Lwt in
   catch
     (fun () ->
@@ -91,7 +80,7 @@ let on_uri ctxt logs ?token_metadata_big_map uri =
       (*return None *)
       fail_with "this error"
 
-let fetch_contract_metadata log log_exn src =
+let fetch_contract_metadata ctxt log log_exn src =
   let full_input = validate_address src in
   let logs prefix s = log (prefix ^ " " ^ s) in
   let open Lwt in
@@ -101,12 +90,9 @@ let fetch_contract_metadata log log_exn src =
         ~log:(logs "Getting URI g")
       >>= fun metadata_uri ->
       Contract_metadata.Uri.Fetcher.set_current_contract ctxt address ;
-      (* probably don't need
-         log result (Import.Message.text "Now going for: " %% Import.Message.inline_code metadata_uri) ;
-      *)
       Lwt.catch
         (fun () ->
-          Contract_metadata.Content.token_metadata_value ctxt ~address ~key:""
+          Contract_metadata.Content.token_metadata_value ctxt ~address
             ~log:(logs "Getting Token Metadata")
           >>= fun token_metadata -> Lwt.return_some token_metadata )
         (fun exn ->
@@ -117,36 +103,47 @@ let fetch_contract_metadata log log_exn src =
       match Contract_metadata.Uri.validate metadata_uri with
       | Ok uri, _ -> on_uri ctxt logs uri ?token_metadata_big_map
       | Error _, _ -> fail_with "FIXME wrong uri "
-      (*
+      (* fixme
                     (mkexn
                        (uri_there_but_wrong ctxt ~uri_string:metadata_uri
                           ~full_input ~error ) ) )
-                          *)
-      )
+      *) )
   | `Uri (_, uri) ->
       if Contract_metadata.Uri.needs_context_address uri then
         log "This URI requires a context KT1 address …" ;
       on_uri ctxt logs uri
   | `Error (_, _) -> fail_with "wrong type?"
-(*raise (mkexn (Tezos_html.error_trace ctxt el))*)
+(* fixme raise (mkexn (Tezos_html.error_trace ctxt el))*)
 
 let log_exn prefix exn =
   let _ = exn in
   (* fixme *)
   print_endline prefix
 
-let show_metadata src format =
-  B58_hashes.crypto_test () ;
-  let _ = format in
-  (* fixme *)
+let show_metadata src format debug =
+  let ctxt =
+    let system = System.create () in
+    let nodes = Query_nodes.get_default_nodes () in
+    let fetcher = Contract_metadata.Uri.Fetcher.create () in
+    object
+      method system = system
+      method nodes = nodes
+      method fetcher = fetcher
+      method formatter = if debug then Fmt.stderr else Caml.Format.str_formatter
+    end in
   let open Lwt.Infix in
   Lwt_main.run
-    ( fetch_contract_metadata print_endline log_exn src
+    ( fetch_contract_metadata ctxt print_endline log_exn src
     >>= fun result ->
     ( match result with
     | None -> print_endline "wrong"
-    | Some (_, contents) ->
-        Metadata_contents.pp Caml.Format.std_formatter contents ) ;
+    | Some (_, contents) -> (
+      match format with
+      | Text Full -> Metadata_contents.pp Caml.Format.std_formatter contents
+      | Text Short ->
+          Metadata_contents.pp_short Caml.Format.std_formatter contents
+      | Raw -> () (* fixme *)
+      | Json -> () (* fixme *) ) ) ;
     Lwt.return 0 )
 
 (* CLI *)
@@ -164,11 +161,16 @@ let metadata_format =
     & opt format ~vopt:(Text Full) (Text Full)
     & info ["format"] ~docv:"FORMAT" ~doc)
 
+let debug =
+  let doc = "Debugging output to stderr." in
+  let yes = (true, Arg.info ["debug"] ~doc) in
+  Arg.(last & vflag_all [false] [yes])
+
 let src =
   let doc = "source" in
   Arg.(required & pos 0 (some string) None & info [] ~docv:"SRC" ~doc)
 
-let show_metadata_t = Term.(const show_metadata $ src $ metadata_format)
+let show_metadata_t = Term.(const show_metadata $ src $ metadata_format $ debug)
 
 let info =
   let doc = "Show TZIP-16 metadata" in

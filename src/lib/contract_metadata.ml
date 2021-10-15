@@ -383,13 +383,13 @@ module Content = struct
         []
     | Seq (_, _l), _t -> []
 
-  let token_metadata_value ctxt ~address ~key ~(log : string -> unit) =
+  let token_metadata_value ctxt ~address ~(log : string -> unit) =
     let open Lwt in
     let open Query_nodes in
     let logf f = Fmt.kstr log f in
     find_node_with_contract ctxt address
     >>= fun node ->
-    logf "Found contract with node %S" node.Node.name ;
+    dbgf ctxt#formatter "Found contract with node %S" node.Node.name ;
     Node.metadata_big_map ctxt node ~address ~log
     >>= fun metacontract ->
     let Node.Contract.{storage_node; type_node; _} = metacontract in
@@ -804,7 +804,7 @@ module Token = struct
     Uri.Fetcher.set_current_contract ctxt address ;
     Lwt.catch
       (fun () ->
-        Content.token_metadata_value ctxt ~address ~key:""
+        Content.token_metadata_value ctxt ~address
           ~log:(logs "Getting %token_metadata big-map")
         >>= fun token_metadata -> Lwt.return_some token_metadata )
       (fun _exn ->

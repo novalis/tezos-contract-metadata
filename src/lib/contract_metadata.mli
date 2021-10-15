@@ -82,7 +82,6 @@ module Content : sig
        ; formatter: Format.formatter
        ; .. >
     -> address:string
-    -> key:'a
     -> log:(string -> unit)
     -> Z.t Lwt.t
   (** Return metadata about a token FIXME this docstring doesn't make sense *)

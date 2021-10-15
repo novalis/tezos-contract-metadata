@@ -60,7 +60,6 @@ module Node = struct
       dbgf ctxt#formatter "get uri %S" uri ;
       Cohttp_lwt_unix.Client.get (Uri.of_string uri)
       >>= fun (resp, body) ->
-      dbgf ctxt#formatter "HERE" ;
       Cohttp_lwt.Body.to_string body
       >>= fun content ->
       match Cohttp.Response.status resp with
