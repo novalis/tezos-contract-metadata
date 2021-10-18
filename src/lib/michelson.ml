@@ -97,7 +97,7 @@ module Partial_type = struct
       | List of type_kind
       | Map of type_kind * type_kind
 
-    type leaf = string Reactive.var
+    type leaf = string
 
     type t =
       | Leaf of
@@ -118,57 +118,34 @@ module Partial_type = struct
   let of_type ?(annotations = []) (Micheline m) =
     let view_annots = annotations in
     let open Tezos_micheline.Micheline in
+    (* find the annotation with a given key, if any *)
     let describe annot =
       List.find view_annots ~f:(fun (k, _) ->
           List.mem annot k ~equal:String.equal ) in
-    let rec go tp =
-      let raw = strip_locations tp in
-      let leaf ?annot kind =
+    let rec go type_ =
+      let raw = strip_locations type_ in
+      let create_leaf ?annot kind =
         let description = Option.bind ~f:describe annot in
-        Leaf {raw; kind; v= Reactive.var ""; description} in
-      match tp with
-      | Prim (_, "nat", [], annot) -> leaf Nat ~annot
-      | Prim (_, "mutez", [], annot) -> leaf Mutez ~annot
-      | Prim (_, "bytes", [], annot) -> leaf Bytes ~annot
-      | Prim (_, "string", [], annot) -> leaf String ~annot
-      | Prim (_, "address", [], annot) -> leaf Address ~annot
-      | Prim (_, "bool", [], annot) -> leaf Bool ~annot
+        Leaf {raw; kind; v= ""; description} in
+      match type_ with
+      | Prim (_, "nat", [], annot) -> create_leaf Nat ~annot
+      | Prim (_, "mutez", [], annot) -> create_leaf Mutez ~annot
+      | Prim (_, "bytes", [], annot) -> create_leaf Bytes ~annot
+      | Prim (_, "string", [], annot) -> create_leaf String ~annot
+      | Prim (_, "address", [], annot) -> create_leaf Address ~annot
+      | Prim (_, "bool", [], annot) -> create_leaf Bool ~annot
       | Prim (_, "pair", [l; r], _) -> Pair {left= go l; right= go r}
       | Prim (_, "list", [Prim (_, "nat", [], _)], annot) ->
-          leaf (List Nat) ~annot
+          create_leaf (List Nat) ~annot
       | Prim
           ( _
           , "map"
           , [Prim (_, "string", [], _); Prim (_, "bytes", [], _)]
           , annot ) ->
-          leaf (Map (String, Bytes)) ~annot
-      | Prim (_, _, _, annot) -> leaf Any ~annot
-      | _ -> leaf Any in
+          create_leaf (Map (String, Bytes)) ~annot
+      | Prim (_, _, _, annot) -> create_leaf Any ~annot
+      | _ -> create_leaf Any in
     {original= m; structure= go (root m)}
-
-  let rec fill_structure_with_value mf node =
-    let open Tezos_micheline.Micheline in
-    let mich_node = micheline_node_to_string in
-    match (mf, node) with
-    | Leaf leaf, nn -> Reactive.set leaf.v (mich_node nn)
-    | Pair {left; right}, Prim (_, "Pair", [l; r], _) ->
-        fill_structure_with_value left l ;
-        fill_structure_with_value right r
-    | Pair _, other ->
-        Decorate_error.(
-          raise
-            Message.(
-              text "Type mismatch"
-              %% inline_code (mich_node other)
-              %% text "is not a pair."))
-
-  let fill_with_value mf node = fill_structure_with_value mf.structure node
-
-  let peek m =
-    let rec pk = function
-      | Leaf l -> Reactive.peek l.v
-      | Pair {left; right} -> Fmt.str "(Pair %s %s)" (pk left) (pk right) in
-    pk m.structure
 
   let validate_micheline m =
     match parse_micheline ~check_indentation:false ~check_primitives:true m with
@@ -176,29 +153,21 @@ module Partial_type = struct
     | Error _ -> false
 
   let rec validate_structure = function
-    | Leaf {kind= Nat | Mutez; v; _} ->
-        Reactive.(
-          get v
-          |> map ~f:(function
-               | "" -> false
-               | s -> (
-                 match Z.of_string s with _ -> true | exception _ -> false ) ))
-    | Leaf {kind= Bytes; v; _} ->
-        Reactive.(
-          get v
-          |> map ~f:(function
-               | "" -> false
-               | s -> (
-                 match String.chop_prefix (String.strip s) ~prefix:"0x" with
-                 | None -> false
-                 | Some s -> (
-                   match Hex.to_string (`Hex s) with
-                   | _ -> true
-                   | exception _ -> false ) ) ))
-    | Leaf lf -> Reactive.(get lf.v |> map ~f:validate_micheline)
-    | Pair {left; right} ->
-        Reactive.(
-          map2 ~f:( && ) (validate_structure left) (validate_structure right))
+    | Leaf {kind= Nat | Mutez; v; _} -> (
+      match v with
+      | "" -> false
+      | s -> ( match Z.of_string s with _ -> true | exception _ -> false ) )
+    | Leaf {kind= Bytes; v; _} -> (
+      match v with
+      | "" -> false
+      | s -> (
+        match String.chop_prefix (String.strip s) ~prefix:"0x" with
+        | None -> false
+        | Some s -> (
+          match Hex.to_string (`Hex s) with _ -> true | exception _ -> false ) )
+      )
+    | Leaf lf -> validate_micheline lf.v
+    | Pair {left; right} -> validate_structure left && validate_structure right
 
   let is_valid pt = validate_structure pt.structure
 
