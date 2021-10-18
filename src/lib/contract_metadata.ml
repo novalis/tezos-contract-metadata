@@ -58,8 +58,8 @@ module Uri = struct
       let alternate = "https://dweb.link/ipfs/" in
       {gateway= {main; alternate}}
 
-    let get (ctxt : < fetcher: t ; .. > Context.t) = ctxt#fetcher
-    let gateway ctxt = (get ctxt).gateway
+    let fetcher = create ()
+    let gateway = fetcher.gateway
   end
 
   let rec needs_context_address =
@@ -69,10 +69,10 @@ module Uri = struct
     | Web _ | Storage _ | Ipfs _ -> false
     | Hash {target; _} -> needs_context_address target
 
-  let to_ipfs_gateway ?(alt_gateway = false) ctxt ~cid ~path =
+  let to_ipfs_gateway ~alt_gateway ~cid ~path =
     let gateway =
-      if alt_gateway then (Fetcher.gateway ctxt).alternate
-      else (Fetcher.gateway ctxt).main in
+      if alt_gateway then Fetcher.gateway.alternate else Fetcher.gateway.main
+    in
     Fmt.str "%s%s%s" gateway cid path
 
   let fetch ?limit_bytes ?prefix ctxt uri ~current_contract =
@@ -92,7 +92,7 @@ module Uri = struct
           ctxt#http_get ?limit_bytes http_uri
       | Ipfs {cid; path} ->
           logf "IPFS CID %S path %S" cid path ;
-          let gatewayed = to_ipfs_gateway ctxt ~cid ~path in
+          let gatewayed = to_ipfs_gateway ~alt_gateway:false ~cid ~path in
           (* resolve (Web gatewayed) *)
           Lwt.catch
             (fun () -> resolve (Web gatewayed))
@@ -100,8 +100,7 @@ module Uri = struct
               dbgf ctxt#formatter
                 "Trying alternate IPFS gateway due to exception: %s"
                 (Exn.to_string e) ;
-              let gatewayed_alt =
-                to_ipfs_gateway ctxt ~alt_gateway:true ~cid ~path in
+              let gatewayed_alt = to_ipfs_gateway ~alt_gateway:true ~cid ~path in
               resolve (Web gatewayed_alt) )
       | Storage {network= None; address; key} ->
           let addr =

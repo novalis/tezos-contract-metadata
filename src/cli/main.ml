@@ -156,12 +156,10 @@ let http_with_timeout ctxt http_method uri =
 let show_metadata src format debug =
   let ctxt =
     let nodes = Query_nodes.get_default_nodes () in
-    let fetcher = Contract_metadata.Uri.Fetcher.create () in
     let now () = Unix.gettimeofday () /. 1000. in
     let time_zero = now () in
     object (self)
       method nodes = nodes
-      method fetcher = fetcher
       method formatter = if debug then Fmt.stderr else Caml.Format.str_formatter
       method sleep = Lwt_unix.sleep
       method http_timeout () = 5.0

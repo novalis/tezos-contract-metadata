@@ -36,8 +36,7 @@ module Uri : sig
   val fetch :
        ?limit_bytes:int
     -> ?prefix:string
-    -> < fetcher: Fetcher.t
-       ; nodes: Query_nodes.Node_list.t
+    -> < nodes: Query_nodes.Node_list.t
        ; formatter: Caml.Format.formatter
        ; http_get: ?limit_bytes:int -> string -> string Lwt.t
        ; http_post:
