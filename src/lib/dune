@@ -4,4 +4,5 @@
  (inline_tests)
  (preprocess
   (pps ppx_inline_test))
- (libraries tezos-micheline cohttp fmt base digestif base58 stdio))
+ (libraries tezos-micheline cohttp fmt base digestif base58 stdio)
+ (modules_without_implementation http_client))

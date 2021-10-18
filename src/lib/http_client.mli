@@ -22,52 +22,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open! Base
+
 open! Import
 
-module Uri : sig
-  module Fetcher : sig
-    type gateway = {main: string; alternate: string}
-    type t = {gateway: gateway}
-
-    val create : unit -> t
-  end
-
-  val fetch :
-       ?limit_bytes:int
-    -> ?prefix:string
-    -> < nodes: Query_nodes.Node_list.t
-       ; formatter: Caml.Format.formatter
-       ; http_client: Http_client.t
-       ; program_time: unit -> float
-       ; .. >
-    -> Metadata_uri.t
-    -> current_contract:string option
-    -> string Lwt.t
-
-  val validate :
-       string
-    -> (Metadata_uri.t, Tezos_error_monad.TzCore.error list) Result.t
-       * ([> `Address | `Network] * string * string) list
-
-  val needs_context_address : Metadata_uri.t -> bool
-end
-
-module Content : sig
-  val token_metadata_value :
-       < nodes: Query_nodes.Node_list.t
-       ; formatter: Caml.Format.formatter
-       ; http_client: Http_client.t
-       ; program_time: unit -> float
-       ; .. >
-    -> address:string
-    -> log:(string -> unit)
-    -> Z.t Lwt.t
-  (** Return metadata about a token FIXME this docstring doesn't make sense *)
-
-  val of_json :
-       string
-    -> ( [`Fixed_legacy of string * string] list * Metadata_contents.t
-       , Tezos_error_monad.Error_monad.tztrace )
-       Result.t
-end
+type t =
+  { get: ?limit_bytes:int -> string -> string Lwt.t
+  ; post: headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t }

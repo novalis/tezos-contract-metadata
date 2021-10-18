@@ -70,11 +70,11 @@ module Node = struct
   let create ~network ?info_url name prefix =
     {name; prefix; rpc_cache= Rpc_cache.create (); network; info_url}
 
-  let rpc_get ctxt node path =
+  let rpc_get (ctxt : < http_client: Http_client.t ; .. >) node path =
     let uri = Fmt.str "%s/%s" node.prefix path in
     let open Lwt in
     let actually_get uri : string Lwt.t =
-      let content = ctxt#http_get ?limit_bytes:None uri in
+      let content = ctxt#http_client.get ?limit_bytes:None uri in
       content
       >>= fun c ->
       Rpc_cache.add ctxt node.rpc_cache ~rpc:path ~response:c ;
@@ -84,7 +84,7 @@ module Node = struct
     | age, Some _ when Float.(age > 120.) -> actually_get uri
     | _, Some s -> Lwt.return s
 
-  let rpc_post ctxt node ~body path =
+  let rpc_post (ctxt : < http_client: Http_client.t ; .. >) node ~body path =
     let uri = Fmt.str "%s/%s" node.prefix path in
     (* FIXME: accretive error messages
        let fail_decorated msg =
@@ -95,7 +95,7 @@ module Node = struct
              %% code_block body %% msg) in
     *)
     let headers = Cohttp.Header.of_list [("content_type", "application/json")] in
-    ctxt#http_post ~headers ~body uri
+    ctxt#http_client.post ~headers ~body uri
 
   let get_storage ctxt node ~address ~log =
     Lwt.catch

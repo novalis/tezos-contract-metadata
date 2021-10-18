@@ -47,9 +47,7 @@ let validate_address input_value =
         ( input_value
         , [Tezos_error_monad.Error_monad.failure "Invalid KT1 address"] )
   | exception _ -> (
-    match
-      Tezos_contract_metadata.Contract_metadata.Uri.validate input_value
-    with
+    match Contract_metadata.Uri.validate input_value with
     | Ok uri, _ -> `Uri (input_value, uri)
     | Error e, _ -> `Error (input_value, e) )
 
@@ -178,6 +176,9 @@ let show_metadata src format debug =
           (fun uri ->
             Cohttp_lwt_unix.Client.post ~body:(`String body) ~headers uri )
           uri
+
+      method http_client : Http_client.t =
+        { get= self#http_get; post= self#http_post }
     end in
   let log_exn prefix exn =
     dbgf ctxt#formatter "%s: %s" prefix (Exn.to_string exn) in

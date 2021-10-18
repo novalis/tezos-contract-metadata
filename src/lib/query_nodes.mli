@@ -59,9 +59,7 @@ module Node : sig
 
   val micheline_value_of_big_map_at_nat :
        < formatter: Caml.Format.formatter
-       ; http_get: ?limit_bytes:int -> string -> string Lwt.t
-       ; http_post:
-           headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+       ; http_client: Http_client.t
        ; program_time: unit -> float
        ; .. >
     -> t
@@ -72,9 +70,7 @@ module Node : sig
 
   val metadata_big_map :
        < formatter: Caml.Format.formatter
-       ; http_get: ?limit_bytes:int -> string -> string Lwt.t
-       ; http_post:
-           headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+       ; http_client: Http_client.t
        ; program_time: unit -> float
        ; .. >
     -> t
@@ -90,9 +86,7 @@ end
 val metadata_value :
      < nodes: Node_list.t
      ; formatter: Caml.Format.formatter
-     ; http_get: ?limit_bytes:int -> string -> string Lwt.t
-     ; http_post:
-         headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+     ; http_client: Http_client.t
      ; program_time: unit -> float
      ; .. >
   -> address:string
@@ -103,9 +97,7 @@ val metadata_value :
 val find_node_with_contract :
      < nodes: Node_list.t
      ; formatter: Caml.Format.formatter
-     ; http_get: ?limit_bytes:int -> string -> string Lwt.t
-     ; http_post:
-         headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+     ; http_client: Http_client.t
      ; program_time: unit -> float
      ; .. >
   -> string
@@ -114,9 +106,7 @@ val find_node_with_contract :
 val call_off_chain_view :
      < nodes: Node_list.t
      ; formatter: Caml.Format.formatter
-     ; http_get: ?limit_bytes:int -> string -> string Lwt.t
-     ; http_post:
-         headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+     ; http_client: Http_client.t
      ; program_time: unit -> float
      ; .. >
   -> log:(string -> unit)

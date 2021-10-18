@@ -75,7 +75,8 @@ module Uri = struct
     in
     Fmt.str "%s%s%s" gateway cid path
 
-  let fetch ?limit_bytes ?prefix ctxt uri ~current_contract =
+  let fetch ?limit_bytes ?prefix (ctxt : < http_client: Http_client.t ; .. >)
+      uri ~current_contract =
     let log =
       match prefix with
       | None -> dbgf ctxt#formatter "Uri.fetch.log: %s"
@@ -89,7 +90,7 @@ module Uri = struct
       function
       | Web http_uri ->
           logf "HTTP %S" http_uri ;
-          ctxt#http_get ?limit_bytes http_uri
+          ctxt#http_client.get ?limit_bytes http_uri
       | Ipfs {cid; path} ->
           logf "IPFS CID %S path %S" cid path ;
           let gatewayed = to_ipfs_gateway ~alt_gateway:false ~cid ~path in
