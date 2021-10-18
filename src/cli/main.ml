@@ -137,6 +137,7 @@ let show_metadata src format debug =
       method nodes = nodes
       method fetcher = fetcher
       method formatter = if debug then Fmt.stderr else Caml.Format.str_formatter
+      method sleep = Lwt_unix.sleep
 
       method http_get uri =
         let open Lwt in

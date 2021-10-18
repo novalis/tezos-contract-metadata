@@ -177,7 +177,7 @@ module System = struct
   let with_timeout ctxt ~f ~raise =
     let open Lwt.Infix in
     let timeout = http_timeout_peek ctxt in
-    Lwt.pick [f (); (Lwt_unix.sleep timeout >>= fun () -> raise timeout)]
+    Lwt.pick [f (); (ctxt#sleep timeout >>= fun () -> raise timeout)]
 
   let now () = Unix.gettimeofday () /. 1000.
   let time_zero = now ()
