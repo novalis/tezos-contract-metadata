@@ -38,9 +38,10 @@ module Uri : sig
     -> ?prefix:string
     -> < fetcher: Fetcher.t
        ; nodes: Query_nodes.Node_list.t
-       ; system: System.t
        ; formatter: Caml.Format.formatter
-       ; http_get: string -> string Lwt.t
+       ; http_get: ?limit_bytes:int -> string -> string Lwt.t
+       ; http_post:
+           headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
        ; .. >
     -> Metadata_uri.t
     -> current_contract:string option
@@ -77,9 +78,10 @@ module Content : sig
 
   val token_metadata_value :
        < nodes: Query_nodes.Node_list.t
-       ; system: System.t
        ; formatter: Caml.Format.formatter
-       ; http_get: string -> string Lwt.t
+       ; http_get: ?limit_bytes:int -> string -> string Lwt.t
+       ; http_post:
+           headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
        ; .. >
     -> address:string
     -> log:(string -> unit)
@@ -119,9 +121,10 @@ module Token : sig
   val token_fetch :
        < fetcher: Uri.Fetcher.t
        ; nodes: Query_nodes.Node_list.t
-       ; system: System.t
        ; formatter: Caml.Format.formatter
-       ; http_get: string -> string Lwt.t
+       ; http_get: ?limit_bytes:int -> string -> string Lwt.t
+       ; http_post:
+           headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
        ; .. >
     -> address:string
     -> id:int

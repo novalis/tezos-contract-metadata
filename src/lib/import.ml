@@ -154,31 +154,6 @@ module Decorate_error = struct
 end
 
 module System = struct
-  type t = {dev_mode: bool Reactive.var; http_timeout: float Reactive.var}
-
-  let create ?(dev_mode = false) () =
-    {dev_mode= Reactive.var dev_mode; http_timeout= Reactive.var 5.}
-
-  let get (state : < system: t ; .. > Context.t) = state#system
-  let set_dev_mode c v = Reactive.set (get c).dev_mode v
-  let dev_mode c = Reactive.get (get c).dev_mode
-
-  let dev_mode_bidirectional state =
-    (get state).dev_mode |> Reactive.Bidirectional.of_var
-
-  let if_dev c f = if Reactive.peek (get c).dev_mode then f () else ()
-  let set_http_timeout c v = Reactive.set (get c).http_timeout v
-  let http_timeout c = Reactive.get (get c).http_timeout
-  let http_timeout_peek c = Reactive.peek (get c).http_timeout
-
-  let http_timeout_bidirectional c =
-    Reactive.Bidirectional.of_var (get c).http_timeout
-
-  let with_timeout ctxt ~f ~raise =
-    let open Lwt.Infix in
-    let timeout = http_timeout_peek ctxt in
-    Lwt.pick [f (); (ctxt#sleep timeout >>= fun () -> raise timeout)]
-
   let now () = Unix.gettimeofday () /. 1000.
   let time_zero = now ()
   let program_time () = now () -. time_zero

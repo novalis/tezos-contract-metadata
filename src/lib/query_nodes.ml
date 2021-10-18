@@ -76,7 +76,7 @@ module Node = struct
     let uri = Fmt.str "%s/%s" node.prefix path in
     let open Lwt in
     let actually_get uri : string Lwt.t =
-      let content = ctxt#http_get uri in
+      let content = ctxt#http_get ?limit_bytes:None uri in
       content
       >>= fun c ->
       Rpc_cache.add ctxt node.rpc_cache ~rpc:path ~response:c ;
@@ -94,35 +94,8 @@ module Node = struct
           text "Calling" %% inline_code "HTTP-POST" %% inline_code path
           %% text "on node" %% inline_code node.name %% text "with"
           %% code_block body %% msg) in
-    System.with_timeout ctxt
-      ~f:
-        Cohttp_lwt_unix.Client.(
-          fun () ->
-            let headers =
-              Cohttp.Header.of_list [("content_type", "application/json")] in
-            let open Lwt in
-            post ~body:(`String body) ~headers (Uri.of_string uri)
-            >>= fun (resp, body) ->
-            let code =
-              resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
-            dbgf ctxt#formatter "%s %s code: %d" node.prefix path code ;
-            Cohttp_lwt.Body.to_string body
-            >>= fun body_string ->
-            match code with
-            | 200 -> return body_string
-            | _ ->
-                dbgf ctxt#formatter "CONTENT: %s" body_string ;
-                fail_decorated
-                  Message.(
-                    Fmt.kstr text "failed with with return code %d:" code
-                    %% code_block
-                         ( try
-                             Ezjsonm.value_from_string body_string
-                             |> Ezjsonm.value_to_string ~minify:false
-                           with _ -> body_string )))
-      ~raise:(fun timeout ->
-        fail_decorated
-          Message.(Fmt.kstr text "timed out after %0.3f seconds." timeout) )
+    let headers = Cohttp.Header.of_list [("content_type", "application/json")] in
+    ctxt#http_post ~headers ~body uri
 
   let ping ctxt node =
     let open Lwt.Infix in

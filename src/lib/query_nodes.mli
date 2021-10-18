@@ -59,8 +59,9 @@ module Node : sig
 
   val micheline_value_of_big_map_at_nat :
        < formatter: Format.formatter
-       ; system: System.t
-       ; http_get: string -> string Lwt.t
+       ; http_get: ?limit_bytes:int -> string -> string Lwt.t
+       ; http_post:
+           headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
        ; .. >
     -> t
     -> big_map_id:Z.t
@@ -69,9 +70,10 @@ module Node : sig
     -> (int, string) Tezos_micheline.Micheline.node Lwt.t
 
   val metadata_big_map :
-       < system: System.t
-       ; formatter: Format.formatter
-       ; http_get: string -> string Lwt.t
+       < formatter: Format.formatter
+       ; http_get: ?limit_bytes:int -> string -> string Lwt.t
+       ; http_post:
+           headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
        ; .. >
     -> t
     -> address:string
@@ -85,9 +87,10 @@ end
 
 val metadata_value :
      < nodes: Node_list.t
-     ; system: System.t
      ; formatter: Format.formatter
-     ; http_get: string -> string Lwt.t
+     ; http_get: ?limit_bytes:int -> string -> string Lwt.t
+     ; http_post:
+         headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
      ; .. >
   -> address:string
   -> key:string
@@ -96,18 +99,20 @@ val metadata_value :
 
 val find_node_with_contract :
      < nodes: Node_list.t
-     ; system: System.t
      ; formatter: Format.formatter
-     ; http_get: string -> string Lwt.t
+     ; http_get: ?limit_bytes:int -> string -> string Lwt.t
+     ; http_post:
+         headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
      ; .. >
   -> string
   -> Node.t Lwt.t
 
 val call_off_chain_view :
      < nodes: Node_list.t
-     ; system: System.t
      ; formatter: Format.formatter
-     ; http_get: string -> string Lwt.t
+     ; http_get: ?limit_bytes:int -> string -> string Lwt.t
+     ; http_post:
+         headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
      ; .. >
   -> log:(string -> unit)
   -> address:string

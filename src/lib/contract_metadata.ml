@@ -83,25 +83,6 @@ module Uri = struct
     | Hash {kind; value; target= Web http} -> Some http
     | _ -> None
 
-  let http_get ctxt ?limit_bytes url =
-    let open Lwt.Infix in
-    System.with_timeout ctxt
-      ~raise:(fun timeout -> Fmt.failwith "HTTP Call timed out: %.3f s" timeout)
-      ~f:(fun () ->
-        let headers =
-          Option.map limit_bytes ~f:(fun b ->
-              Cohttp.Header.of_list [("Range", Fmt.str "bytes=0-%d" b)] ) in
-        Cohttp_lwt_unix.Client.get (Uri.of_string url) ?headers
-        >>= fun (resp, body) ->
-        match Cohttp.Response.status resp with
-        | `OK ->
-            Cohttp_lwt.Body.to_string body >>= fun content -> Lwt.return content
-        | _ ->
-            Lwt.fail_with
-              (Printf.sprintf "Wrong HTTP status: %s"
-                 (Cohttp.Response.sexp_of_t resp |> Sexp.to_string_hum) )
-            >>= fun content -> Lwt.return content )
-
   let fetch ?limit_bytes ?prefix ctxt uri ~current_contract =
     let log =
       match prefix with
@@ -116,7 +97,7 @@ module Uri = struct
       function
       | Web http_uri ->
           logf "HTTP %S" http_uri ;
-          http_get ?limit_bytes ctxt http_uri
+          ctxt#http_get ?limit_bytes http_uri
       | Ipfs {cid; path} ->
           logf "IPFS CID %S path %S" cid path ;
           let gatewayed = to_ipfs_gateway ctxt ~cid ~path in
