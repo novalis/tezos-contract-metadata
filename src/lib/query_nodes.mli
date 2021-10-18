@@ -62,6 +62,7 @@ module Node : sig
        ; http_get: ?limit_bytes:int -> string -> string Lwt.t
        ; http_post:
            headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+       ; program_time: unit -> float
        ; .. >
     -> t
     -> big_map_id:Z.t
@@ -74,6 +75,7 @@ module Node : sig
        ; http_get: ?limit_bytes:int -> string -> string Lwt.t
        ; http_post:
            headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+       ; program_time: unit -> float
        ; .. >
     -> t
     -> address:string
@@ -91,6 +93,7 @@ val metadata_value :
      ; http_get: ?limit_bytes:int -> string -> string Lwt.t
      ; http_post:
          headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+     ; program_time: unit -> float
      ; .. >
   -> address:string
   -> key:string
@@ -103,6 +106,7 @@ val find_node_with_contract :
      ; http_get: ?limit_bytes:int -> string -> string Lwt.t
      ; http_post:
          headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+     ; program_time: unit -> float
      ; .. >
   -> string
   -> Node.t Lwt.t
@@ -113,6 +117,7 @@ val call_off_chain_view :
      ; http_get: ?limit_bytes:int -> string -> string Lwt.t
      ; http_post:
          headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+     ; program_time: unit -> float
      ; .. >
   -> log:(string -> unit)
   -> address:string

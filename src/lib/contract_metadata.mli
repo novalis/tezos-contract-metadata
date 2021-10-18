@@ -42,6 +42,7 @@ module Uri : sig
        ; http_get: ?limit_bytes:int -> string -> string Lwt.t
        ; http_post:
            headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+       ; program_time: unit -> float
        ; .. >
     -> Metadata_uri.t
     -> current_contract:string option
@@ -82,6 +83,7 @@ module Content : sig
        ; http_get: ?limit_bytes:int -> string -> string Lwt.t
        ; http_post:
            headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+       ; program_time: unit -> float
        ; .. >
     -> address:string
     -> log:(string -> unit)
@@ -125,6 +127,7 @@ module Token : sig
        ; http_get: ?limit_bytes:int -> string -> string Lwt.t
        ; http_post:
            headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
+       ; program_time: unit -> float
        ; .. >
     -> address:string
     -> id:int

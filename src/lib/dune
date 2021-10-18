@@ -4,8 +4,7 @@
  (inline_tests)
  (preprocess
   (pps ppx_inline_test))
- (libraries tezos-micheline cohttp cohttp-lwt-unix fmt base lwd digestif
-   base58 stdio))
+ (libraries tezos-micheline cohttp fmt base lwd digestif base58 stdio))
 
 (env
  (dev

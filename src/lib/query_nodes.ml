@@ -40,12 +40,12 @@ module Rpc_cache = struct
   let create () : t = Hashtbl.create 42
 
   let add ctxt (t : t) ~rpc ~response =
-    let now = System.program_time () in
+    let now = ctxt#program_time () in
     dbgf ctxt#formatter "CACHE-ADD: %s (%.0f)" rpc now ;
     Hashtbl.add t rpc (now, response)
 
   let get ctxt (t : t) ~rpc =
-    let now = System.program_time () in
+    let now = ctxt#program_time () in
     let best_ts = ref 0. in
     let best = ref None in
     let filter r (ts, v) =

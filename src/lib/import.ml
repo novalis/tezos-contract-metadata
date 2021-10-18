@@ -153,12 +153,6 @@ module Decorate_error = struct
       | _ -> None )
 end
 
-module System = struct
-  let now () = Unix.gettimeofday () /. 1000.
-  let time_zero = now ()
-  let program_time () = now () -. time_zero
-end
-
 module Ezjsonm = struct
   include Ezjsonm
 
