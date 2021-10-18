@@ -87,6 +87,8 @@ module Decorate_error = struct
       | _ -> None )
 end
 
+(** We need this because JSOO can't p[to,oze] generalized tail calls -- see e.g.
+    https://github.com/mirage/ezjsonm/issues/41 *)
 module Ezjsonm = struct
   include Ezjsonm
 
@@ -293,36 +295,17 @@ module Ezjsonm = struct
     | exception e -> Fmt.failwith "JSON Parising error: exception %a" Exn.pp e
 end
 
-module Blob = struct
-  module Format = struct
-    type t = [`Image | `Video] * string
+let%test "Test ezjsonm bad json" =
+  let src = `String "five" in
+  let decoded = Ezjsonm.Stack_reimplementation.json_of_src src in
+  match decoded with `Error (((_, _), (_, _)), _) -> true | `JSON _ -> false
 
-    let gif = (`Image, "gif")
-    let jpeg = (`Image, "jpeg")
-    let png = (`Image, "png")
-    let mp4 = (`Video, "mp4")
+let%test "Test ezjsonm unclosed" =
+  let src = `String "[5" in
+  let decoded = Ezjsonm.Stack_reimplementation.json_of_src src in
+  match decoded with `Error (((_, _), (_, _)), _) -> true | `JSON _ -> false
 
-    let of_mime_exn = function
-      | image when String.is_prefix image ~prefix:"image/" ->
-          (`Image, String.chop_prefix_exn image ~prefix:"image/")
-      | vid when String.is_prefix vid ~prefix:"video/" ->
-          (`Video, String.chop_prefix_exn vid ~prefix:"video/")
-      | other -> Fmt.failwith "Unknown MIME type: %S" other
-
-    let to_mime = function
-      | `Image, f -> "image/" ^ f
-      | `Video, f -> "video/" ^ f
-  end
-
-  let guess_format s : Format.t option =
-    (* https://stackoverflow.com/questions/55869/determine-file-type-of-an-image
-       https://en.wikipedia.org/wiki/JPEG *)
-    let open Format in
-    let prefixes =
-      [ ("\255\216\255", jpeg)
-      ; ("\137\080\078\071", png)
-      ; ("GIF", gif)
-      ; ("\x00\x00\x00\x20ftypmp42", mp4) ] in
-    List.find_map prefixes ~f:(fun (prefix, fmt) ->
-        if String.is_prefix s ~prefix then Some fmt else None )
-end
+let%test "Test ezjsonm short json" =
+  let src = `String "[4]" in
+  let decoded = Ezjsonm.Stack_reimplementation.json_of_src src in
+  match decoded with `Error (((_, _), (_, _)), _) -> false | `JSON _ -> true
