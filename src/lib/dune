@@ -5,8 +5,3 @@
  (preprocess
   (pps ppx_inline_test))
  (libraries tezos-micheline cohttp fmt base digestif base58 stdio))
-
-(env
- (dev
-  (flags
-   (:standard -warn-error -A))))

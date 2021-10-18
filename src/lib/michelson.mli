@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Import
+open! Import
 open Tezos_micheline
 
 module Partial_type : sig

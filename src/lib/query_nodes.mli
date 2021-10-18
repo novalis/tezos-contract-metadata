@@ -58,7 +58,7 @@ module Node : sig
   end
 
   val micheline_value_of_big_map_at_nat :
-       < formatter: Format.formatter
+       < formatter: Caml.Format.formatter
        ; http_get: ?limit_bytes:int -> string -> string Lwt.t
        ; http_post:
            headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
@@ -71,7 +71,7 @@ module Node : sig
     -> (int, string) Tezos_micheline.Micheline.node Lwt.t
 
   val metadata_big_map :
-       < formatter: Format.formatter
+       < formatter: Caml.Format.formatter
        ; http_get: ?limit_bytes:int -> string -> string Lwt.t
        ; http_post:
            headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
@@ -89,7 +89,7 @@ end
 
 val metadata_value :
      < nodes: Node_list.t
-     ; formatter: Format.formatter
+     ; formatter: Caml.Format.formatter
      ; http_get: ?limit_bytes:int -> string -> string Lwt.t
      ; http_post:
          headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
@@ -102,7 +102,7 @@ val metadata_value :
 
 val find_node_with_contract :
      < nodes: Node_list.t
-     ; formatter: Format.formatter
+     ; formatter: Caml.Format.formatter
      ; http_get: ?limit_bytes:int -> string -> string Lwt.t
      ; http_post:
          headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
@@ -113,7 +113,7 @@ val find_node_with_contract :
 
 val call_off_chain_view :
      < nodes: Node_list.t
-     ; formatter: Format.formatter
+     ; formatter: Caml.Format.formatter
      ; http_get: ?limit_bytes:int -> string -> string Lwt.t
      ; http_post:
          headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t
@@ -126,7 +126,7 @@ val call_off_chain_view :
   -> ( (int, string) Tezos_micheline.Micheline.node
        * (int, string) Tezos_micheline.Micheline.node
      , 'b )
-     result
+     Result.t
      Lwt.t
 
 val get_default_nodes : unit -> Node_list.t

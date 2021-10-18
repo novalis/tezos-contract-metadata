@@ -209,7 +209,7 @@ module Ezjsonm = struct
   let value_from_string s =
     match json_of_src (`String s) with
     | `JSON j -> j
-    | `Error (((line, col), (eline, ecol)), err) ->
+    | `Error (((line, col), (_eline, _ecol)), err) ->
         Decorate_error.raise
           Message.(
             (* Adapted from

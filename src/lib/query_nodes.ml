@@ -30,8 +30,6 @@ module Node_status = struct
   type t = Uninitialized | Non_responsive of exn | Ready of string
 end
 
-open Node_status
-
 module Rpc_cache = struct
   module Hashtbl = Caml.Hashtbl
 
@@ -88,22 +86,16 @@ module Node = struct
 
   let rpc_post ctxt node ~body path =
     let uri = Fmt.str "%s/%s" node.prefix path in
-    let fail_decorated msg =
-      Decorate_error.raise
-        Message.(
-          text "Calling" %% inline_code "HTTP-POST" %% inline_code path
-          %% text "on node" %% inline_code node.name %% text "with"
-          %% code_block body %% msg) in
+    (* FIXME: accretive error messages
+       let fail_decorated msg =
+         Decorate_error.raise
+           Message.(
+             text "Calling" %% inline_code "HTTP-POST" %% inline_code path
+             %% text "on node" %% inline_code node.name %% text "with"
+             %% code_block body %% msg) in
+    *)
     let headers = Cohttp.Header.of_list [("content_type", "application/json")] in
     ctxt#http_post ~headers ~body uri
-
-  let ping ctxt node =
-    let open Lwt.Infix in
-    Lwt.catch
-      (fun () ->
-        rpc_get ctxt node "/chains/main/blocks/head/metadata"
-        >>= fun metadata -> Lwt.return (Ready metadata) )
-      (fun e -> Lwt.return (Non_responsive e))
 
   let get_storage ctxt node ~address ~log =
     Lwt.catch
@@ -222,20 +214,9 @@ module Node_list = struct
   let add ?(dev = false) t n =
     List.Assoc.add ~equal:String.equal t n.Node.name (n, dev)
 
-  let remove_by_name t n = List.Assoc.remove ~equal:String.equal t n
-
-  let remove_dev t =
-    List.filter t ~f:(function _, (_, true) -> false | _ -> true)
-
-  let fold_nodes t ~init ~f = List.fold t ~init ~f:(fun p (_, (n, _)) -> f p n)
   let map t ~f = List.map t ~f:(fun (_, (n, _)) -> f n)
-  let concat_map t ~f = List.concat_map t ~f:(fun (_, (n, _)) -> f n)
   let nodes t = map t ~f:(fun x -> x)
 end
-
-type t = {nodes: Node_list.t}
-
-let create () = {nodes= Node_list.empty}
 
 (* TODO: move to network.ml *)
 let default_nodes : Node.t list =
@@ -281,7 +262,7 @@ let find_node_with_contract ctxt addr =
             (fun () ->
               Fmt.kstr (Node.rpc_get ctxt node)
                 "/chains/main/blocks/head/context/contracts/%s/storage" addr
-              >>= fun network -> return_true )
+              >>= fun _network -> return_true )
             (fun exn ->
               dbgf ctxt#formatter "exn %S" (Exn.to_string exn) ;
               trace := exn :: !trace ;
