@@ -190,9 +190,12 @@ let show_metadata src format debug =
     | None -> print_endline "wrong"
     | Some (_, contents) -> (
       match format with
-      | Text Full -> Metadata_contents.pp Caml.Format.std_formatter contents
+      | Text Full ->
+          Metadata_contents.pp Caml.Format.std_formatter contents ;
+          print_endline ""
       | Text Short ->
-          Metadata_contents.pp_short Caml.Format.std_formatter contents
+          Metadata_contents.pp_short Caml.Format.std_formatter contents ;
+          print_endline ""
       | Raw -> () (* fixme *)
       | Json -> () (* fixme *) ) ) ;
     Lwt.return 0 )
