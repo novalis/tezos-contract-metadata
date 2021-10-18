@@ -40,6 +40,7 @@ module Uri : sig
        ; nodes: Query_nodes.Node_list.t
        ; system: System.t
        ; formatter: Caml.Format.formatter
+       ; http_get: string -> string Lwt.t
        ; .. >
     -> Metadata_uri.t
     -> current_contract:string option
@@ -78,6 +79,7 @@ module Content : sig
        < nodes: Query_nodes.Node_list.t
        ; system: System.t
        ; formatter: Caml.Format.formatter
+       ; http_get: string -> string Lwt.t
        ; .. >
     -> address:string
     -> log:(string -> unit)
@@ -119,6 +121,7 @@ module Token : sig
        ; nodes: Query_nodes.Node_list.t
        ; system: System.t
        ; formatter: Caml.Format.formatter
+       ; http_get: string -> string Lwt.t
        ; .. >
     -> address:string
     -> id:int

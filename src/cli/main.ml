@@ -118,16 +118,52 @@ let fetch_contract_metadata ctxt log_exn src =
   | `Error (_, _) -> fail_with "wrong type?"
 (* fixme raise (mkexn (Tezos_html.error_trace ctxt el))*)
 
+let fail_decorated msg =
+  Decorate_error.raise
+    Message.(
+      text "Calling" %% inline_code "HTTP-GET"
+      %% inline_code "fixme (was path)"
+      %% text "on node"
+      %% inline_code "fixme (was node.name)"
+      %% msg)
+
 let show_metadata src format debug =
   let ctxt =
     let system = System.create () in
     let nodes = Query_nodes.get_default_nodes () in
     let fetcher = Contract_metadata.Uri.Fetcher.create () in
-    object
+    object (self)
       method system = system
       method nodes = nodes
       method fetcher = fetcher
       method formatter = if debug then Fmt.stderr else Caml.Format.str_formatter
+
+      method http_get uri =
+        let open Lwt in
+        dbgf self#formatter "get uri %S" uri ;
+        let res =
+          System.with_timeout self
+            ~raise:(fun timeout ->
+              Fmt.failwith "HTTP Call timed out: %.3f s" timeout )
+            ~f:(fun () ->
+              Cohttp_lwt_unix.Client.get (Uri.of_string uri)
+              >>= fun (resp, body) ->
+              Cohttp_lwt.Body.to_string body
+              >>= fun content ->
+              match Cohttp.Response.status resp with
+              | `OK ->
+                  dbgf self#formatter "response ok %d"
+                    ( resp |> Cohttp.Response.status
+                    |> Cohttp.Code.code_of_status ) ;
+                  return content
+              | _ ->
+                  let code =
+                    resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status
+                  in
+                  dbgf self#formatter "response bad %d" code ;
+                  fail_decorated
+                    Message.(Fmt.kstr text "Wrong HTTP status: %d" code) ) in
+        res
     end in
   let log_exn prefix exn =
     dbgf ctxt#formatter "%s: %s" prefix (Exn.to_string exn) in

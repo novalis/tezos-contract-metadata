@@ -74,38 +74,16 @@ module Node = struct
 
   let rpc_get ctxt node path =
     let uri = Fmt.str "%s/%s" node.prefix path in
-    let fail_decorated msg =
-      Decorate_error.raise
-        Message.(
-          text "Calling" %% inline_code "HTTP-GET" %% inline_code path
-          %% text "on node" %% inline_code node.name %% msg) in
-    let actually_get () =
-      let open Lwt in
-      dbgf ctxt#formatter "get uri %S" uri ;
-      System.with_timeout ctxt
-        ~raise:(fun timeout ->
-          Fmt.failwith "HTTP Call timed out: %.3f s" timeout )
-        ~f:(fun () ->
-          Cohttp_lwt_unix.Client.get (Uri.of_string uri)
-          >>= fun (resp, body) ->
-          Cohttp_lwt.Body.to_string body
-          >>= fun content ->
-          match Cohttp.Response.status resp with
-          | `OK ->
-              dbgf ctxt#formatter "response ok %d"
-                (resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status) ;
-              Rpc_cache.add ctxt node.rpc_cache ~rpc:path ~response:content ;
-              return content
-          | _ ->
-              let code =
-                resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status
-              in
-              dbgf ctxt#formatter "response bad %d" code ;
-              fail_decorated
-                Message.(Fmt.kstr text "Wrong HTTP status: %d" code) ) in
+    let open Lwt in
+    let actually_get uri : string Lwt.t =
+      let content = ctxt#http_get uri in
+      content
+      >>= fun c ->
+      Rpc_cache.add ctxt node.rpc_cache ~rpc:path ~response:c ;
+      return c in
     match Rpc_cache.get ctxt node.rpc_cache ~rpc:path with
-    | _, None -> actually_get ()
-    | age, Some _ when Float.(age > 120.) -> actually_get ()
+    | _, None -> actually_get uri
+    | age, Some _ when Float.(age > 120.) -> actually_get uri
     | _, Some s -> Lwt.return s
 
   let rpc_post ctxt node ~body path =

@@ -58,7 +58,10 @@ module Node : sig
   end
 
   val micheline_value_of_big_map_at_nat :
-       < formatter: Format.formatter ; system: System.t ; .. >
+       < formatter: Format.formatter
+       ; system: System.t
+       ; http_get: string -> string Lwt.t
+       ; .. >
     -> t
     -> big_map_id:Z.t
     -> key:int
@@ -66,7 +69,10 @@ module Node : sig
     -> (int, string) Tezos_micheline.Micheline.node Lwt.t
 
   val metadata_big_map :
-       < system: System.t ; formatter: Format.formatter ; .. >
+       < system: System.t
+       ; formatter: Format.formatter
+       ; http_get: string -> string Lwt.t
+       ; .. >
     -> t
     -> address:string
     -> log:(string -> unit)
@@ -78,19 +84,31 @@ module Node_list : sig
 end
 
 val metadata_value :
-     < nodes: Node_list.t ; system: System.t ; formatter: Format.formatter ; .. >
+     < nodes: Node_list.t
+     ; system: System.t
+     ; formatter: Format.formatter
+     ; http_get: string -> string Lwt.t
+     ; .. >
   -> address:string
   -> key:string
   -> log:(string -> unit)
   -> string Lwt.t
 
 val find_node_with_contract :
-     < nodes: Node_list.t ; system: System.t ; formatter: Format.formatter ; .. >
+     < nodes: Node_list.t
+     ; system: System.t
+     ; formatter: Format.formatter
+     ; http_get: string -> string Lwt.t
+     ; .. >
   -> string
   -> Node.t Lwt.t
 
 val call_off_chain_view :
-     < nodes: Node_list.t ; system: System.t ; formatter: Format.formatter ; .. >
+     < nodes: Node_list.t
+     ; system: System.t
+     ; formatter: Format.formatter
+     ; http_get: string -> string Lwt.t
+     ; .. >
   -> log:(string -> unit)
   -> address:string
   -> view:Metadata_contents.View.Implementation.Michelson_storage.t
