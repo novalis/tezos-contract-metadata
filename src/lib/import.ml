@@ -28,6 +28,10 @@ open Base
 let dbg out fmt = Fmt.pf out "@[tezos-contract-metadata-debug: %a@]%!\n" fmt ()
 let dbgf out fmt = Fmt.(kstr (fun s -> dbg out (const string s))) fmt
 
+(** Return a list, elements mapped through ~map, with elements before the last
+    separated with ~sep, and with the last element separated with ~last_sep.
+    Note that ~last_sep must include ~sep if you want a genuine Oxford comma --
+    but then you'll get it in two-element lists too*)
 let rec oxfordize_list l ~map ~sep ~last_sep =
   match l with
   | [] -> []
@@ -35,9 +39,45 @@ let rec oxfordize_list l ~map ~sep ~last_sep =
   | [one; two] -> [map one; last_sep (); map two]
   | one :: more -> map one :: sep () :: oxfordize_list more ~map ~sep ~last_sep
 
+let%test "oxfordize_list" =
+  let comma () = ", " in
+  let and_ () = ", and " in
+  List.equal String.equal
+    (oxfordize_list
+       ["my parents"; "God"; "Ayn Rand"]
+       ~map:Fn.id ~sep:comma ~last_sep:and_ )
+    ["my parents"; ", "; "God"; ", and "; "Ayn Rand"]
+
+let%test "oxfordize_list two element" =
+  let comma () = ", " in
+  let and_ () = ", and " in
+  List.equal String.equal
+    (oxfordize_list ["God"; "Ayn Rand"] ~map:Fn.id ~sep:comma ~last_sep:and_)
+    ["God"; ", and "; "Ayn Rand"]
+
+let%test "oxfordize_list single-element" =
+  let sep () = "unused" in
+  List.equal String.equal
+    (oxfordize_list ~map:String.capitalize ~sep ~last_sep:sep ["foo"])
+    ["Foo"]
+
+(** If s is longer than ~max_length, replace any characters after ~max_length
+    with ?ellipsis *)
 let ellipsize_string ?(ellipsis = " …") s ~max_length =
   if String.length s <= max_length then s
   else String.prefix s max_length ^ ellipsis
+
+let%test "ellipsize shortens" =
+  String.equal
+    (ellipsize_string ?ellipsis:(Some " yadda yadda yadda") "too long"
+       ~max_length:5 )
+    "too l yadda yadda yadda"
+
+let%test "ellipsize at exact len" =
+  String.equal
+    (ellipsize_string ?ellipsis:(Some " yadda yadda yadda") "just right"
+       ~max_length:10 )
+    "just right"
 
 let bytes_summary ?(threshold = 25) ?(left = 10) ?(right = 10) bytes =
   match String.length bytes with
