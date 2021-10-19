@@ -54,17 +54,6 @@ module Uri : sig
 end
 
 module Content : sig
-  val token_metadata_value :
-       < nodes: Query_nodes.Node_list.t
-       ; formatter: Caml.Format.formatter
-       ; http_client: Http_client.t
-       ; program_time: unit -> float
-       ; .. >
-    -> address:string
-    -> log:(string -> unit)
-    -> Z.t Lwt.t
-  (** Return metadata about a token FIXME this docstring doesn't make sense *)
-
   val of_json :
        string
     -> ( [`Fixed_legacy of string * string] list * Metadata_contents.t
