@@ -51,9 +51,7 @@ let validate_address input_value =
     | Ok uri, _ -> `Uri (input_value, uri)
     | Error e, _ -> `Error (input_value, e) )
 
-let on_uri ctxt ?token_metadata_big_map uri ~address =
-  (* fixme Not sure what to do with token_metadata_big_map parameter -- it's just a (maybe big) number? *)
-  let _ = token_metadata_big_map in
+let on_uri ctxt uri ~address =
   let open Lwt in
   catch
     (fun () ->
@@ -80,7 +78,7 @@ let on_uri ctxt ?token_metadata_big_map uri ~address =
       (*return None *)
       fail_with "this error"
 
-let fetch_contract_metadata ctxt log_exn src =
+let fetch_contract_metadata ctxt src =
   let log = dbgf ctxt#formatter "%s" in
   let full_input = validate_address src in
   let logs prefix s = log (prefix ^ " " ^ s) in
@@ -90,19 +88,8 @@ let fetch_contract_metadata ctxt log_exn src =
       Query_nodes.metadata_value ctxt ~address ~key:""
         ~log:(logs "Getting URI g")
       >>= fun metadata_uri ->
-      Lwt.catch
-        (fun () ->
-          Contract_metadata.Content.token_metadata_value ctxt ~address
-            ~log:(logs "Getting Token Metadata")
-          >>= fun token_metadata -> Lwt.return_some token_metadata )
-        (fun exn ->
-          log_exn "Attempt at getting a %token_metadata big-map failed (main):"
-            exn ;
-          return_none )
-      >>= fun token_metadata_big_map ->
       match Contract_metadata.Uri.validate metadata_uri with
-      | Ok uri, _ ->
-          on_uri ctxt uri ?token_metadata_big_map ~address:(Some address)
+      | Ok uri, _ -> on_uri ctxt uri ~address:(Some address)
       | Error _, _ -> fail_with "FIXME wrong uri "
       (* fixme
                     (mkexn
@@ -180,11 +167,9 @@ let show_metadata src format debug =
       method http_client : Http_client.t =
         { get= self#http_get; post= self#http_post }
     end in
-  let log_exn prefix exn =
-    dbgf ctxt#formatter "%s: %s" prefix (Exn.to_string exn) in
   let open Lwt.Infix in
   Lwt_main.run
-    ( fetch_contract_metadata ctxt log_exn src
+    ( fetch_contract_metadata ctxt src
     >>= fun result ->
     ( match result with
     | None -> print_endline "wrong"
