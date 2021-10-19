@@ -49,6 +49,45 @@ module Uri = struct
     in
     (uri, List.rev !errors)
 
+  let%test "validate_address bogus-schema" =
+    (* Here, we expect  validate_address to return Ok even though it has some errors.  FIXME: why?*)
+    match validate "bogus-schema://nope" with
+    | Ok _uri, [] -> false
+    | Ok _uri, _ -> true
+    | Error _e, _ -> true
+
+  let%test "validate_address tezos-storage" =
+    match
+      validate "tezos-storage://KT1QDFEu8JijYbsJqzoXq7mKvfaQQamHD1kX/foo"
+    with
+    | Ok _uri, _ -> true
+    | Error e, _ ->
+        List.iter
+          ~f:(fun item ->
+            Caml.Format.printf "error %a\n" Tezos_error_monad.TzCore.pp item )
+          e ;
+        false
+
+  let%test "validate_address tezos-storage no path" =
+    match validate "tezos-storage://KT1QDFEu8JijYbsJqzoXq7mKvfaQQamHD1kX" with
+    | Ok _uri, _ -> true
+    | Error e, _ ->
+        List.iter
+          ~f:(fun item ->
+            Caml.Format.printf "error %a\n" Tezos_error_monad.TzCore.pp item )
+          e ;
+        false
+
+  let%test "validate_address tezos-storage bogus address" =
+    match validate "tezos-storage://nope" with
+    | Ok _uri, _ -> true
+    | Error e, _ ->
+        List.iter
+          ~f:(fun item ->
+            Caml.Format.printf "error %a\n" Tezos_error_monad.TzCore.pp item )
+          e ;
+        false
+
   module Fetcher = struct
     type gateway = {main: string; alternate: string}
     type t = {gateway: gateway}
