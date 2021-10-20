@@ -47,9 +47,9 @@ let validate_address input_value =
         ( input_value
         , [Tezos_error_monad.Error_monad.failure "Invalid KT1 address"] )
   | exception _ -> (
-    match Contract_metadata.Uri.validate input_value with
-    | Ok uri, _ -> `Uri (input_value, uri)
-    | Error e, _ -> `Error (input_value, e) )
+    match Metadata_uri.of_uri (Uri.of_string input_value) with
+    | Ok uri -> `Uri (input_value, uri)
+    | Error e -> `Error (input_value, e) )
 
 let on_uri ctxt uri ~address =
   let open Lwt in
@@ -88,9 +88,9 @@ let fetch_contract_metadata ctxt src =
       Query_nodes.metadata_value ctxt ~address ~key:""
         ~log:(logs "Getting URI g")
       >>= fun metadata_uri ->
-      match Contract_metadata.Uri.validate metadata_uri with
-      | Ok uri, _ -> on_uri ctxt uri ~address:(Some address)
-      | Error _, _ -> fail_with "FIXME wrong uri "
+      match Metadata_uri.of_uri (Uri.of_string metadata_uri) with
+      | Ok uri -> on_uri ctxt uri ~address:(Some address)
+      | Error _ -> fail_with "FIXME wrong uri "
       (* fixme
                     (mkexn
                        (uri_there_but_wrong ctxt ~uri_string:metadata_uri

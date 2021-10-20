@@ -39,6 +39,8 @@ type t =
 
 module Parsing_error : sig
   type error_kind =
+    | Bad_b58 of string * string
+    | Wrong_network of string * string
     | Wrong_scheme of string option
     | Missing_cid_for_ipfs
     | Wrong_tezos_storage_host of string
@@ -63,9 +65,7 @@ type field_validation =
      result
 
 val of_uri :
-     ?validate_network:field_validation
-  -> ?validate_kt1_address:field_validation
-  -> Uri.t
+     Uri.t
   -> ( t
      , Tezos_error_monad.Error_monad.error
        Tezos_error_monad.Error_monad.TzTrace.trace )

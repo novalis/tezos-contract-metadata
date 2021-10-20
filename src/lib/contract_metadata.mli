@@ -45,11 +45,6 @@ module Uri : sig
     -> current_contract:string option
     -> string Lwt.t
 
-  val validate :
-       string
-    -> (Metadata_uri.t, Tezos_error_monad.TzCore.error list) Result.t
-       * ([> `Address | `Network] * string * string) list
-
   val needs_context_address : Metadata_uri.t -> bool
 end
 
