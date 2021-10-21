@@ -68,15 +68,17 @@ let on_uri ctxt uri ~address =
                      ?token_metadata_big_map ~metadata:json_code ) ;
                 Lwt.return ()
                 *)
-      return (Some (warnings, contents))
-  | Error _trace ->
+      return (warnings, contents)
+  | Error trace ->
       (*
                 raise
                   (mkexn
                      (uri_ok_but_metadata_failure ctxt ~uri ~full_input
                         ~metadata_json:json_code ~error ) )*)
       (*return None *)
-      fail_with "this error"
+      Fmt.kstr fail_with "Failed to retrieve contract %s %a"
+        (Metadata_uri.to_string_uri uri)
+        Tezos_error_monad.Error_monad.pp_print_error trace
 
 let fetch_contract_metadata ctxt src =
   let full_input = validate_address src in
@@ -89,12 +91,9 @@ let fetch_contract_metadata ctxt src =
       >>= fun metadata_uri ->
       match Metadata_uri.of_uri (Uri.of_string metadata_uri) with
       | Ok uri -> on_uri ctxt uri ~address:(Some address)
-      | Error _ -> fail_with "FIXME wrong uri "
-      (* fixme
-                    (mkexn
-                       (uri_there_but_wrong ctxt ~uri_string:metadata_uri
-                          ~full_input ~error ) ) )
-      *) )
+      | Error errors ->
+          Fmt.kstr fail_with "Wrong url %s %a" metadata_uri
+            Tezos_error_monad.Error_monad.pp_print_error errors )
   | `Uri (_, uri) ->
       if Contract_metadata.Uri.needs_context_address uri then
         dbgf ctxt "This URI requires a context KT1 address …" ;
@@ -174,18 +173,16 @@ let show_metadata src format debug =
   Lwt_main.run
     ( fetch_contract_metadata ctxt src
     >>= fun result ->
-    ( match result with
-    | None -> print_endline "wrong"
-    | Some (_, contents) -> (
-      match format with
-      | Text Full ->
-          Metadata_contents.pp Caml.Format.std_formatter contents ;
-          print_endline ""
-      | Text Short ->
-          Metadata_contents.pp_short Caml.Format.std_formatter contents ;
-          print_endline ""
-      | Raw -> () (* fixme *)
-      | Json -> print_endline (Metadata_contents.to_json contents) ) ) ;
+    (let _warnings, contents = result in
+     match format with
+     | Text Full ->
+         Metadata_contents.pp Caml.Format.std_formatter contents ;
+         print_endline ""
+     | Text Short ->
+         Metadata_contents.pp_short Caml.Format.std_formatter contents ;
+         print_endline ""
+     | Raw -> () (* fixme *)
+     | Json -> print_endline (Metadata_contents.to_json contents) ) ;
     Lwt.return 0 )
 
 (* CLI *)
