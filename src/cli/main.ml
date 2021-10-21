@@ -102,21 +102,14 @@ let fetch_contract_metadata ctxt src =
       Fmt.kstr fail_with "wrong type: %a"
         Tezos_error_monad.Error_monad.pp_print_error trace
 
-let fail_decorated msg =
-  Decorate_error.raise
-    Message.(
-      text "Calling" %% inline_code "HTTP-GET"
-      %% inline_code "fixme (was path)"
-      %% text "on node"
-      %% inline_code "fixme (was node.name)"
-      %% msg)
+let fail_decorated msg = Decorate_error.raise (Message.text msg)
 
 let with_timeout ctxt ~f ~raise =
   let open Lwt.Infix in
   let timeout = ctxt#http_timeout () in
   Lwt.pick [f (); (ctxt#sleep timeout >>= fun () -> raise timeout)]
 
-let http_with_timeout ctxt http_method uri =
+let http_with_timeout ctxt ~method_name http_method uri =
   let open Lwt in
   dbgf ctxt "get uri %S" uri ;
   with_timeout ctxt
@@ -135,7 +128,8 @@ let http_with_timeout ctxt http_method uri =
           let code =
             resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
           dbgf ctxt "response bad %d" code ;
-          fail_decorated Message.(Fmt.kstr text "Wrong HTTP status: %d" code) )
+          Fmt.kstr fail_decorated "Wrong HTTP status from http %s of %s: %d"
+            method_name uri code )
 
 let show_metadata src format debug =
   let ctxt =
@@ -154,12 +148,12 @@ let show_metadata src format debug =
         let headers =
           Option.map limit_bytes ~f:(fun b ->
               Cohttp.Header.of_list [("Range", Fmt.str "bytes=0-%d" b)] ) in
-        http_with_timeout self
+        http_with_timeout self ~method_name:"get"
           (fun uri -> Cohttp_lwt_unix.Client.get ?headers uri)
           uri
 
       method http_post ~headers ~body uri =
-        http_with_timeout self
+        http_with_timeout self ~method_name:"post"
           (fun uri ->
             Cohttp_lwt_unix.Client.post ~body:(`String body) ~headers uri )
           uri

@@ -53,8 +53,7 @@ module Uri = struct
     in
     Fmt.str "%s%s%s" gateway cid path
 
-  let fetch ?limit_bytes ?prefix (ctxt : < http_client: Http_client.t ; .. >)
-      uri ~current_contract =
+  let fetch ?limit_bytes ?prefix (ctxt : 'a Context.t) uri ~current_contract =
     let log =
       match prefix with
       | None -> dbgf ctxt "Uri.fetch.log: %s"
