@@ -79,14 +79,13 @@ let on_uri ctxt uri ~address =
       fail_with "this error"
 
 let fetch_contract_metadata ctxt src =
-  let log = dbgf ctxt "%s" in
   let full_input = validate_address src in
-  let logs prefix s = log (prefix ^ " " ^ s) in
   let open Lwt in
   match full_input with
   | `KT1 address -> (
-      Query_nodes.metadata_value ctxt ~address ~key:""
-        ~log:(logs "Getting URI g")
+      Query_nodes.metadata_value
+        (ctxt#with_log_context "Getting URI")
+        ~address ~key:""
       >>= fun metadata_uri ->
       match Metadata_uri.of_uri (Uri.of_string metadata_uri) with
       | Ok uri -> on_uri ctxt uri ~address:(Some address)
@@ -98,7 +97,7 @@ let fetch_contract_metadata ctxt src =
       *) )
   | `Uri (_, uri) ->
       if Contract_metadata.Uri.needs_context_address uri then
-        log "This URI requires a context KT1 address …" ;
+        dbgf ctxt "This URI requires a context KT1 address …" ;
       on_uri ctxt uri ~address:None
   | `Error (_address, _trace) -> fail_with "wrong type: "
 (* fixme raise (mkexn (Tezos_html.error_trace ctxt el))*)

@@ -83,7 +83,7 @@ module Node = struct
     let headers = Cohttp.Header.of_list [("content_type", "application/json")] in
     ctxt#http_client.post ~headers ~body uri
 
-  let get_storage ctxt node ~address ~log =
+  let get_storage ctxt node ~address =
     Lwt.catch
       (fun () ->
         Fmt.kstr
@@ -95,7 +95,7 @@ module Node = struct
           "/chains/main/blocks/head/context/contracts/%s/storage/normalized"
           address )
       (fun _ ->
-        log "Node does not handle /normalized" ;
+        dbgf ctxt "Node does not handle /normalized" ;
         Fmt.kstr (rpc_get ctxt node)
           "/chains/main/blocks/head/context/contracts/%s/storage" address )
 
@@ -109,25 +109,26 @@ module Node = struct
       {storage_node; type_node; metadata_big_map}
   end
 
-  let metadata_big_map ctxt node ~address ~log =
+  let metadata_big_map ctxt node ~address =
     let open Lwt in
-    get_storage ctxt node ~address ~log
+    get_storage ctxt node ~address
     >>= fun storage_string ->
     let get = rpc_get ctxt node in
-    let log fmt = Fmt.kstr log fmt in
-    log "Got raw storage: %s" storage_string ;
+    dbgf ctxt "Got raw storage: %s" storage_string ;
     let mich_storage = Michelson.micheline_of_json storage_string in
-    log "As concrete: %a" Micheline_helpers.pp_arbitrary_micheline mich_storage ;
+    dbgf ctxt "As concrete: %a" Micheline_helpers.pp_arbitrary_micheline
+      mich_storage ;
     Lwt.return ()
     >>= fun () ->
     Fmt.kstr get "/chains/main/blocks/head/context/contracts/%s/script" address
     >>= fun script_string ->
-    log "Got raw script: %s…" (ellipsize_string script_string ~max_length:30) ;
+    dbgf ctxt "Got raw script: %s…"
+      (ellipsize_string script_string ~max_length:30) ;
     let mich_storage_type =
       Michelson.micheline_of_json script_string
       |> Tezos_micheline.Micheline.strip_locations
       |> Micheline_helpers.get_storage_type_exn in
-    log "Storage type: %a" Micheline_helpers.pp_arbitrary_micheline
+    dbgf ctxt "Storage type: %a" Micheline_helpers.pp_arbitrary_micheline
       mich_storage_type ;
     Lwt.return ()
     >>= fun () ->
@@ -148,7 +149,7 @@ module Node = struct
             make ~metadata_big_map ~storage_node:mich_storage
               ~type_node:mich_storage_type)
 
-  let bytes_value_of_big_map_at_string ctxt node ~big_map_id ~key ~log =
+  let bytes_value_of_big_map_at_string ctxt node ~big_map_id ~key =
     let open Lwt in
     let hash_string = B58_hashes.b58_script_id_hash_of_michelson_string key in
     Decorate_error.(
@@ -163,7 +164,7 @@ module Node = struct
             "/chains/main/blocks/head/context/big_maps/%s/%s"
             (Z.to_string big_map_id) hash_string ))
     >>= fun bytes_raw_value ->
-    Fmt.kstr log "bytes raw value: %s"
+    dbgf ctxt "bytes raw value: %s"
       (ellipsize_string bytes_raw_value ~max_length:30) ;
     let content =
       match Ezjsonm.value_from_string bytes_raw_value with
@@ -171,7 +172,7 @@ module Node = struct
       | _ -> Fmt.failwith "Cannot find bytes in %s" bytes_raw_value in
     return content
 
-  let micheline_value_of_big_map_at_nat ctxt node ~big_map_id ~key ~log =
+  let micheline_value_of_big_map_at_nat ctxt node ~big_map_id ~key =
     let open Lwt in
     let hash_string = B58_hashes.b58_script_id_hash_of_michelson_int key in
     Decorate_error.(
@@ -186,8 +187,7 @@ module Node = struct
             "/chains/main/blocks/head/context/big_maps/%s/%s"
             (Z.to_string big_map_id) hash_string ))
     >>= fun raw_value ->
-    Fmt.kstr log "JSON raw value: %s"
-      (ellipsize_string raw_value ~max_length:60) ;
+    dbgf ctxt "JSON raw value: %s" (ellipsize_string raw_value ~max_length:60) ;
     let content = Michelson.micheline_of_json raw_value in
     return content
 end
@@ -261,27 +261,21 @@ let find_node_with_contract ctxt addr =
           text "Cannot find a node that knows about address" %% inline_code addr)
       )
 
-let metadata_value ctxt ~address ~key ~(log : string -> unit) =
+let metadata_value ctxt ~address ~key =
   let open Lwt in
-  let logf f = Fmt.kstr log f in
   find_node_with_contract ctxt address
   >>= fun node ->
-  logf "Found contract with node %S" node.Node.name ;
-  Node.metadata_big_map ctxt node ~address ~log
+  dbgf ctxt "Found contract with node %S" node.Node.name ;
+  Node.metadata_big_map ctxt node ~address
   >>= fun metacontract ->
   let big_map_id = metacontract.Node.Contract.metadata_big_map in
-  logf "Metadata big-map: %s" (Z.to_string big_map_id) ;
-  Node.bytes_value_of_big_map_at_string ctxt node ~big_map_id ~key ~log
+  dbgf ctxt "Metadata big-map: %s" (Z.to_string big_map_id) ;
+  Node.bytes_value_of_big_map_at_string ctxt node ~big_map_id ~key
 
-let call_off_chain_view ctxt ~log ~address ~view ~parameter =
+let call_off_chain_view ctxt ~address ~view ~parameter =
   let open Lwt in
   let open Metadata_contents.View.Implementation.Michelson_storage in
-  let logf f =
-    Fmt.kstr
-      (fun s ->
-        log s ;
-        dbgf ctxt "call_off_chain_view: %s" s )
-      f in
+  let logf f = Fmt.kstr (fun s -> dbgf ctxt "call_off_chain_view: %s" s) f in
   logf "Calling %s(%a)" address Micheline_helpers.pp_arbitrary_micheline
     parameter ;
   find_node_with_contract ctxt address
@@ -314,7 +308,7 @@ let call_off_chain_view ctxt ~log ~address ~view ~parameter =
         logf "Can't recognize protocol: `%s` assuming Edo-like." p ;
         (`Granada, p) in
   logf "Protocol is `%s`" protocol_hash ;
-  Node.get_storage ctxt node ~address ~log
+  Node.get_storage ctxt node ~address
   >>= fun storage ->
   logf "Got the storage: %s" storage ;
   Fmt.kstr (Node.rpc_get ctxt node)

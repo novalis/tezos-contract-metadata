@@ -57,15 +57,10 @@ module Node : sig
     -> t
     -> big_map_id:Z.t
     -> key:int
-    -> log:(string -> unit)
     -> (int, string) Tezos_micheline.Micheline.node Lwt.t
 
   val metadata_big_map :
-       < .. > Context.t
-    -> t
-    -> address:string
-    -> log:(string -> unit)
-    -> Contract.t Lwt.t
+    < .. > Context.t -> t -> address:string -> Contract.t Lwt.t
 end
 
 module Node_list : sig
@@ -75,17 +70,12 @@ module Node_list : sig
 end
 
 val metadata_value :
-     < .. > Context.t
-  -> address:string
-  -> key:string
-  -> log:(string -> unit)
-  -> string Lwt.t
+  < .. > Context.t -> address:string -> key:string -> string Lwt.t
 
 val find_node_with_contract : < .. > Context.t -> string -> Node.t Lwt.t
 
 val call_off_chain_view :
      < .. > Context.t
-  -> log:(string -> unit)
   -> address:string
   -> view:Metadata_contents.View.Implementation.Michelson_storage.t
   -> parameter:('a, string) Tezos_micheline.Micheline.node

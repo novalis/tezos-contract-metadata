@@ -89,7 +89,7 @@ module Uri = struct
               | None -> Fmt.failwith "Missing current contract"
               | Some s -> s ) in
           logf "Using address %S (key = %S)" addr key ;
-          Query_nodes.metadata_value ctxt ~address:addr ~key ~log
+          Query_nodes.metadata_value ctxt ~address:addr ~key
       | Storage {network= Some network; address; key} ->
           logf "storage %s %a %S" network Fmt.Dump.(option string) address key ;
           Fmt.kstr not_implemented "storage uri with network = %s" network
