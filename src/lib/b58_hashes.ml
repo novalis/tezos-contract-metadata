@@ -127,31 +127,63 @@ let%test "Base58" =
            h ) in
   String.equal expect actual
 
-let crypto_test () =
+let%test "Crypto test" =
   let dbg fmt = Fmt.pf Fmt.stderr "@[tzcomet-debug: %a@]%!\n" fmt () in
   let dbgf fmt = Fmt.(kstr (fun s -> dbg (const string s))) fmt in
-  let michelson_string_expr_hash s =
+  let michelson_string_expr_hash s expect_bytes_hex expect_digest_raw_hex
+      expect_digest_b58 expect_digest_b58_raw_encode expect_digest_with05_hex
+      expect_digest_with05_b58 expect_digest_with05_b58_raw_encode
+      expect_digest_pfx_b58 =
     dbgf "mseh: %S" s ;
     let bytes = Michelson_bytes.encode_michelson_string s in
+    let expect_hex expected bytes =
+      let (`Hex hx) = Hex.of_string bytes in
+      dbgf "actual 0x%s expect %s\n" hx expected ;
+      assert (String.equal expected ("0x" ^ hx)) in
     let ppb ppf b =
       let (`Hex hx) = Hex.of_string b in
-      Fmt.pf ppf "0x%s" hx in
-    dbgf "bytes: %a" ppb bytes ;
+      Fmt.pf ppf "0x%s\n" hx in
+    expect_hex expect_bytes_hex bytes ;
     let dgst x =
       Digestif.to_raw_string blake2b32 (Digestif.digest_string blake2b32 x)
     in
     let b58 s = Base58.to_string (Base58.of_bytes (module B58_crypto) s) in
-    (* TODO: this is supposed to be Base58.raw_encode but that is not exposed yet *)
-    let bogus_raw_encode (some_bytes : string) = some_bytes in
     dbgf "digest raw: %a -> %s (%s)" ppb (dgst bytes)
       (b58 (dgst bytes))
-      (bogus_raw_encode (dgst bytes)) ;
+      (Base58.raw_encode (dgst bytes)) ;
+    expect_hex expect_digest_raw_hex (dgst bytes) ;
+    assert (String.equal expect_digest_b58 (b58 (dgst bytes))) ;
+    assert (
+      String.equal expect_digest_b58_raw_encode (Base58.raw_encode (dgst bytes)) ) ;
     let with05 = "\x05" ^ bytes in
     dbgf "digest-05: %a → %s [%s]" ppb (dgst with05)
       (b58 (dgst with05))
-      (bogus_raw_encode (dgst with05)) ;
+      (Base58.raw_encode (dgst with05)) ;
+    expect_hex expect_digest_with05_hex (dgst with05) ;
+    assert (String.equal expect_digest_with05_b58 (b58 (dgst with05))) ;
+    assert (
+      String.equal expect_digest_with05_b58_raw_encode
+        (Base58.raw_encode (dgst with05)) ) ;
     dbgf "digest-pfx: %a → %s" ppb (dgst with05)
-      (b58 (script_expr_hash ^ dgst with05)) in
-  michelson_string_expr_hash "" ;
-  michelson_string_expr_hash "foo" ;
-  ()
+      (b58 (script_expr_hash ^ dgst with05)) ;
+    assert (
+      String.equal expect_digest_pfx_b58 (b58 (script_expr_hash ^ dgst with05)) )
+  in
+  michelson_string_expr_hash "" "0x0100000000"
+    "0x3d31a0f322b4ce036466dc45f4ca74d28cbc7bd89427b1b61620aea87c384491"
+    "Tx7g83eUVQUGxWb3Lzxep4MxkCc4hJq3a643QgwJNVKVa3aQz"
+    "57smAWGpXmgT3sKEj6aN26ra6xeyAsbp7Jm1AeAUkYG8"
+    "0x4a1cf11667fa0165eac9963333b883a80bcfdfebde09b79bfc740680e986bab6"
+    "Ze7sbAPDYUELUCEjVNLAJp4tx5Eij6HLKKYV3TmcFrBV9NnhD"
+    "5zJmRN5mEKQUQKYcfDwfSmMPjRZ1RE3PvsKDjhN4TDMX"
+    "expru5X1yxJG6ezR2uHMotwMLNmSzQyh5t1vUnhjx4cS6Pv9qE1Sdo" ;
+  michelson_string_expr_hash "foo" "0x0100000003666f6f"
+    "0xa14995177d1226fb240c04c37f47ca239aee9ee6da9778effaff054b8ef9849a"
+    "2E2sWug5KYw7AbkAbUJABfkdFJ9ysvkTaZNA6LaoNMwtY5LXs3"
+    "BrbiXYu4uo9q8Hd6nAZJncPKQXGAHwscMxYQBatutaWD"
+    "0x7b754bee2b13dd9f9486e6f933e27afc2c31765a8414fc98422255138b04a366"
+    "wNaH8jxsngu2WFEEWRnoCUs4itVyeBZRPJaxzULPsSd48e5vL"
+    "9JvtJaNHvYP5bpF7tjbbtpr8o7Jtptz445dZ8pemDnvH"
+    "expruTFUPVsqkuD5iwLMJuzoyGSFABnxLo7CZrgnS1czt1WbTwpVrJ" ;
+  true
+(* testing is handled in assertions *)

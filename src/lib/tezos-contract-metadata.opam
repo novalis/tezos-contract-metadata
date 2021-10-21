@@ -20,7 +20,7 @@ depends: [
   "fmt"
 ]
 pin-depends: [
-  [ "base58.version" "git+https://github.com/vbmithr/ocaml-base58.git#45be492472b74fe34b1479fb391e83bf62f0e823" ]
+  [ "base58.version" "git+https://github.com/vbmithr/ocaml-base58.git#b7d41eb3bca54fe5c392a2b2110659a13fb4b871" ]
 ]  
 build: [
   ["dune" "build" "-p" name "-j" jobs]
