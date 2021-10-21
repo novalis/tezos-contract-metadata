@@ -185,7 +185,7 @@ let show_metadata src format debug =
           Metadata_contents.pp_short Caml.Format.std_formatter contents ;
           print_endline ""
       | Raw -> () (* fixme *)
-      | Json -> () (* fixme *) ) ) ;
+      | Json -> print_endline (Metadata_contents.to_json contents) ) ) ;
     Lwt.return 0 )
 
 (* CLI *)
