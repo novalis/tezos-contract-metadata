@@ -37,12 +37,7 @@ module Rpc_cache : sig
 end
 
 module Node : sig
-  type t =
-    { name: string
-    ; prefix: string
-    ; rpc_cache: Rpc_cache.t
-    ; network: Network.t
-    ; info_url: string option }
+  type t = Query_node.Node.t
 
   module Contract : sig
     type t =
@@ -58,10 +53,7 @@ module Node : sig
   end
 
   val micheline_value_of_big_map_at_nat :
-       < formatter: Caml.Format.formatter
-       ; http_client: Http_client.t
-       ; program_time: unit -> float
-       ; .. >
+       < .. > Context.t
     -> t
     -> big_map_id:Z.t
     -> key:int
@@ -69,10 +61,7 @@ module Node : sig
     -> (int, string) Tezos_micheline.Micheline.node Lwt.t
 
   val metadata_big_map :
-       < formatter: Caml.Format.formatter
-       ; http_client: Http_client.t
-       ; program_time: unit -> float
-       ; .. >
+       < .. > Context.t
     -> t
     -> address:string
     -> log:(string -> unit)
@@ -81,34 +70,21 @@ end
 
 module Node_list : sig
   type t = (string, Node.t * bool) List.Assoc.t
+
+  val nodes : ('a * ('b * 'c)) list -> 'b list
 end
 
 val metadata_value :
-     < nodes: Node_list.t
-     ; formatter: Caml.Format.formatter
-     ; http_client: Http_client.t
-     ; program_time: unit -> float
-     ; .. >
+     < .. > Context.t
   -> address:string
   -> key:string
   -> log:(string -> unit)
   -> string Lwt.t
 
-val find_node_with_contract :
-     < nodes: Node_list.t
-     ; formatter: Caml.Format.formatter
-     ; http_client: Http_client.t
-     ; program_time: unit -> float
-     ; .. >
-  -> string
-  -> Node.t Lwt.t
+val find_node_with_contract : < .. > Context.t -> string -> Node.t Lwt.t
 
 val call_off_chain_view :
-     < nodes: Node_list.t
-     ; formatter: Caml.Format.formatter
-     ; http_client: Http_client.t
-     ; program_time: unit -> float
-     ; .. >
+     < .. > Context.t
   -> log:(string -> unit)
   -> address:string
   -> view:Metadata_contents.View.Implementation.Michelson_storage.t

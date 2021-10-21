@@ -22,32 +22,14 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open! Base
-open! Import
 
-module Uri : sig
-  module Fetcher : sig
-    type gateway = {main: string; alternate: string}
-    type t = {gateway: gateway}
+module Rpc_cache = struct type t = (string, float * string) Hashtbl.t end
 
-    val create : unit -> t
-  end
-
-  val fetch :
-       ?limit_bytes:int
-    -> ?prefix:string
-    -> < nodes: Query_nodes.Node.t list ; .. > Context.t
-    -> Metadata_uri.t
-    -> current_contract:string option
-    -> string Lwt.t
-
-  val needs_context_address : Metadata_uri.t -> bool
-end
-
-module Content : sig
-  val of_json :
-       string
-    -> ( [`Fixed_legacy of string * string] list * Metadata_contents.t
-       , Tezos_error_monad.Error_monad.tztrace )
-       Result.t
+module Node = struct
+  type t =
+    { name: string
+    ; prefix: string
+    ; rpc_cache: Rpc_cache.t
+    ; network: Network.t
+    ; info_url: string option }
 end

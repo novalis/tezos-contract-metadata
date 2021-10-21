@@ -57,12 +57,12 @@ module Uri = struct
       uri ~current_contract =
     let log =
       match prefix with
-      | None -> dbgf ctxt#formatter "Uri.fetch.log: %s"
-      | Some prefix -> dbgf ctxt#formatter "%s: %s" prefix in
+      | None -> dbgf ctxt "Uri.fetch.log: %s"
+      | Some prefix -> dbgf ctxt "%s: %s" prefix in
     let open Lwt.Infix in
     let logf fmt = Fmt.kstr (fun s -> log s) fmt in
     let not_implemented s = Fmt.failwith "Not Implemented: %s" s in
-    dbgf ctxt#formatter "Fetching ============== " ;
+    dbgf ctxt "Fetching ============== " ;
     let rec resolve =
       let open Metadata_uri in
       function
@@ -76,8 +76,7 @@ module Uri = struct
           Lwt.catch
             (fun () -> resolve (Web gatewayed))
             (fun e ->
-              dbgf ctxt#formatter
-                "Trying alternate IPFS gateway due to exception: %s"
+              dbgf ctxt "Trying alternate IPFS gateway due to exception: %s"
                 (Exn.to_string e) ;
               let gatewayed_alt = to_ipfs_gateway ~alt_gateway:true ~cid ~path in
               resolve (Web gatewayed_alt) )

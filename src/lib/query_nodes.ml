@@ -32,14 +32,13 @@ end
 
 module Rpc_cache = struct
   module Hashtbl = Caml.Hashtbl
-
-  type t = (string, float * string) Hashtbl.t
+  include Query_node.Rpc_cache
 
   let create () : t = Hashtbl.create 42
 
   let add ctxt (t : t) ~rpc ~response =
     let now = ctxt#program_time () in
-    dbgf ctxt#formatter "CACHE-ADD: %s (%.0f)" rpc now ;
+    dbgf ctxt "CACHE-ADD: %s (%.0f)" rpc now ;
     Hashtbl.add t rpc (now, response)
 
   let get ctxt (t : t) ~rpc =
@@ -53,24 +52,18 @@ module Rpc_cache = struct
       if Float.(ts + 120. < now) then None else Some (ts, v) in
     Hashtbl.filter_map_inplace filter t ;
     let age = now -. !best_ts in
-    dbgf ctxt#formatter "CACHE-GET:\n %s\n → now: %.0f\n → age: %.0f\n → %s" rpc
-      now age
+    dbgf ctxt "CACHE-GET:\n %s\n → now: %.0f\n → age: %.0f\n → %s" rpc now age
       (if Option.is_none !best then "MISS" else "HIT") ;
     (age, !best)
 end
 
 module Node = struct
-  type t =
-    { name: string
-    ; prefix: string
-    ; rpc_cache: Rpc_cache.t
-    ; network: Network.t
-    ; info_url: string option }
+  include Query_node.Node
 
   let create ~network ?info_url name prefix =
     {name; prefix; rpc_cache= Rpc_cache.create (); network; info_url}
 
-  let rpc_get (ctxt : < http_client: Http_client.t ; .. >) node path =
+  let rpc_get (ctxt : 'a Context.t) node path =
     let uri = Fmt.str "%s/%s" node.prefix path in
     let open Lwt in
     let actually_get uri : string Lwt.t =
@@ -84,16 +77,9 @@ module Node = struct
     | age, Some _ when Float.(age > 120.) -> actually_get uri
     | _, Some s -> Lwt.return s
 
-  let rpc_post (ctxt : < http_client: Http_client.t ; .. >) node ~body path =
+  let rpc_post (ctxt : 'a Context.t) node ~body path =
     let uri = Fmt.str "%s/%s" node.prefix path in
-    (* FIXME: accretive error messages
-       let fail_decorated msg =
-         Decorate_error.raise
-           Message.(
-             text "Calling" %% inline_code "HTTP-POST" %% inline_code path
-             %% text "on node" %% inline_code node.name %% text "with"
-             %% code_block body %% msg) in
-    *)
+    let ctxt = ctxt#with_log_context ("Calling HTTP-POST on node" ^ node.name) in
     let headers = Cohttp.Header.of_list [("content_type", "application/json")] in
     ctxt#http_client.post ~headers ~body uri
 
@@ -264,10 +250,10 @@ let find_node_with_contract ctxt addr =
                 "/chains/main/blocks/head/context/contracts/%s/storage" addr
               >>= fun _network -> return_true )
             (fun exn ->
-              dbgf ctxt#formatter "exn %S" (Exn.to_string exn) ;
+              dbgf ctxt "exn %S" (Exn.to_string exn) ;
               trace := exn :: !trace ;
               return_false ) )
-        (Node_list.nodes ctxt#nodes)
+        ctxt#nodes
       >>= fun node -> Lwt.return node )
     (fun _ ->
       Decorate_error.raise ~trace:(List.rev !trace)
@@ -294,7 +280,7 @@ let call_off_chain_view ctxt ~log ~address ~view ~parameter =
     Fmt.kstr
       (fun s ->
         log s ;
-        dbgf ctxt#formatter "call_off_chain_view: %s" s )
+        dbgf ctxt "call_off_chain_view: %s" s )
       f in
   logf "Calling %s(%a)" address Micheline_helpers.pp_arbitrary_micheline
     parameter ;

@@ -59,7 +59,7 @@ let on_uri ctxt uri ~address =
         ~current_contract:address )
     (fun e -> raise (Exn.reraise e "Failed to fetch metadata"))
   >>= fun json_code ->
-  dbgf ctxt#formatter "before of-json" ;
+  dbgf ctxt "before of-json" ;
   match Contract_metadata.Content.of_json json_code with
   | Ok (warnings, contents) ->
       (*
@@ -69,7 +69,7 @@ let on_uri ctxt uri ~address =
                 Lwt.return ()
                 *)
       return (Some (warnings, contents))
-  | Error _ ->
+  | Error _trace ->
       (*
                 raise
                   (mkexn
@@ -79,7 +79,7 @@ let on_uri ctxt uri ~address =
       fail_with "this error"
 
 let fetch_contract_metadata ctxt src =
-  let log = dbgf ctxt#formatter "%s" in
+  let log = dbgf ctxt "%s" in
   let full_input = validate_address src in
   let logs prefix s = log (prefix ^ " " ^ s) in
   let open Lwt in
@@ -100,7 +100,7 @@ let fetch_contract_metadata ctxt src =
       if Contract_metadata.Uri.needs_context_address uri then
         log "This URI requires a context KT1 address …" ;
       on_uri ctxt uri ~address:None
-  | `Error (_, _) -> fail_with "wrong type?"
+  | `Error (_address, _trace) -> fail_with "wrong type: "
 (* fixme raise (mkexn (Tezos_html.error_trace ctxt el))*)
 
 let fail_decorated msg =
@@ -119,7 +119,7 @@ let with_timeout ctxt ~f ~raise =
 
 let http_with_timeout ctxt http_method uri =
   let open Lwt in
-  dbgf ctxt#formatter "get uri %S" uri ;
+  dbgf ctxt "get uri %S" uri ;
   with_timeout ctxt
     ~raise:(fun timeout -> Fmt.failwith "HTTP Call timed out: %.3f s" timeout)
     ~f:(fun () ->
@@ -129,21 +129,22 @@ let http_with_timeout ctxt http_method uri =
       >>= fun content ->
       match Cohttp.Response.status resp with
       | `OK ->
-          dbgf ctxt#formatter "response ok %d"
+          dbgf ctxt "response ok %d"
             (resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status) ;
           return content
       | _ ->
           let code =
             resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
-          dbgf ctxt#formatter "response bad %d" code ;
+          dbgf ctxt "response bad %d" code ;
           fail_decorated Message.(Fmt.kstr text "Wrong HTTP status: %d" code) )
 
 let show_metadata src format debug =
   let ctxt =
-    let nodes = Query_nodes.get_default_nodes () in
+    let nodes = Query_nodes.Node_list.nodes (Query_nodes.get_default_nodes ()) in
     let now () = Unix.gettimeofday () /. 1000. in
     let time_zero = now () in
     object (self)
+      val prefix = ""
       method nodes = nodes
       method formatter = if debug then Fmt.stderr else Caml.Format.str_formatter
       method sleep = Lwt_unix.sleep
@@ -166,6 +167,9 @@ let show_metadata src format debug =
 
       method http_client : Http_client.t =
         { get= self#http_get; post= self#http_post }
+
+      method with_log_context new_prefix = {<prefix = new_prefix ^ " " ^ prefix>}
+      method log_context = prefix
     end in
   let open Lwt.Infix in
   Lwt_main.run

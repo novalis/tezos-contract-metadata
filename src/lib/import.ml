@@ -26,7 +26,10 @@
 open Base
 
 let dbg out fmt = Fmt.pf out "@[tezos-contract-metadata-debug: %a@]%!\n" fmt ()
-let dbgf out fmt = Fmt.(kstr (fun s -> dbg out (const string s))) fmt
+
+let dbgf ctxt fmt =
+  Fmt.(kstr (fun s -> dbg ctxt#formatter (const string (s ^ ctxt#log_context))))
+    fmt
 
 (** Return a list, elements mapped through ~map, with elements before the last
     separated with ~sep, and with the last element separated with ~last_sep.
@@ -87,7 +90,18 @@ let bytes_summary ?(threshold = 25) ?(left = 10) ?(right = 10) bytes =
         (String.sub bytes ~pos:0 ~len:left)
         (String.sub bytes ~pos:(m - right) ~len:right)
 
-module Context = struct type 'a t = 'a constraint 'a = < .. > end
+module Context = struct
+  type 'a t = 'a
+    constraint
+      'a =
+      < formatter: Caml.Format.formatter
+      ; log_context: string
+      ; http_client: Http_client.t
+      ; program_time: unit -> float
+      ; with_log_context: string -> 'a t
+      ; nodes: Query_node.Node.t list
+      ; .. >
+end
 
 module Message = struct
   type t =

@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open! Import
-
 type t =
   { get: ?limit_bytes:int -> string -> string Lwt.t
   ; post: headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t }

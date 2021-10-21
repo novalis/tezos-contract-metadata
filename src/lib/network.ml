@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open! Import
-
 type t = [`Mainnet | `Edonet | `Florencenet | `Granadanet | `Sandbox]
 
 let to_string : t -> string = function
