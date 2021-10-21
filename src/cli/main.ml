@@ -98,8 +98,9 @@ let fetch_contract_metadata ctxt src =
       if Contract_metadata.Uri.needs_context_address uri then
         dbgf ctxt "This URI requires a context KT1 address …" ;
       on_uri ctxt uri ~address:None
-  | `Error (_address, _trace) -> fail_with "wrong type: "
-(* fixme raise (mkexn (Tezos_html.error_trace ctxt el))*)
+  | `Error (_address, trace) ->
+      Fmt.kstr fail_with "wrong type: %a"
+        Tezos_error_monad.Error_monad.pp_print_error trace
 
 let fail_decorated msg =
   Decorate_error.raise
