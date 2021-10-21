@@ -82,14 +82,6 @@ let%test "ellipsize at exact len" =
        ~max_length:10 )
     "just right"
 
-let bytes_summary ?(threshold = 25) ?(left = 10) ?(right = 10) bytes =
-  match String.length bytes with
-  | m when m < threshold -> bytes
-  | m ->
-      Fmt.str "%s…%s"
-        (String.sub bytes ~pos:0 ~len:left)
-        (String.sub bytes ~pos:(m - right) ~len:right)
-
 module Context = struct
   type 'a t = 'a
     constraint
