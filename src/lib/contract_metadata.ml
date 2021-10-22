@@ -114,7 +114,6 @@ module Uri = struct
                  with
                  | 0 -> content
                  | _ ->
-                     (* fixme use result *)
                      Fmt.failwith
                        "Hash of content %a is different from expected %a"
                        (Digestif.pp Digestif.sha256)
