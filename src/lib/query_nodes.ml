@@ -66,32 +66,38 @@ module Node = struct
   let rpc_get (ctxt : 'a Context.t) node path =
     let uri = Fmt.str "%s/%s" node.prefix path in
     let open Lwt in
-    let actually_get uri : string Lwt.t =
+    let actually_get uri =
       let content = ctxt#http_client.get ?limit_bytes:None uri in
       content
-      >>= fun c ->
-      Rpc_cache.add ctxt node.rpc_cache ~rpc:path ~response:c ;
-      return c in
+      >>= fun content ->
+      return
+        (Result.map
+           ~f:(fun c ->
+             Rpc_cache.add ctxt node.rpc_cache ~rpc:path ~response:c ;
+             c )
+           content ) in
     match Rpc_cache.get ctxt node.rpc_cache ~rpc:path with
     | _, None -> actually_get uri
     | age, Some _ when Float.(age > 120.) -> actually_get uri
-    | _, Some s -> Lwt.return s
+    | _, Some s -> return (Ok s)
 
-  let rpc_post (ctxt : 'a Context.t) node ~body path =
+  let rpc_post (ctxt : 'a Context.t) ~node ~body path =
     let uri = Fmt.str "%s/%s" node.prefix path in
-    let ctxt = ctxt#with_log_context ("Calling HTTP-POST on node" ^ node.name) in
+    let ctxt =
+      ctxt#with_log_context ("Calling HTTP-POST on node " ^ node.name ^ ": ")
+    in
     let headers = Cohttp.Header.of_list [("content_type", "application/json")] in
     ctxt#http_client.post ~headers ~body uri
 
   let get_storage ctxt node ~address =
     Lwt.catch
       (fun () ->
+        let body =
+          Ezjsonm.(
+            dict [("unparsing_mode", string "Optimized_legacy")]
+            |> value_to_string) in
         Fmt.kstr
-          (rpc_post ctxt node
-             ~body:
-               Ezjsonm.(
-                 dict [("unparsing_mode", string "Optimized_legacy")]
-                 |> value_to_string) )
+          (rpc_post ctxt ~node ~body)
           "/chains/main/blocks/head/context/contracts/%s/storage/normalized"
           address )
       (fun _ ->
@@ -111,6 +117,7 @@ module Node = struct
 
   let metadata_big_map ctxt node ~address =
     let open Lwt in
+    let ( >>= ) = Lwt_result.bind in
     get_storage ctxt node ~address
     >>= fun storage_string ->
     let get = rpc_get ctxt node in
@@ -118,7 +125,7 @@ module Node = struct
     let mich_storage = Michelson.micheline_of_json storage_string in
     dbgf ctxt "As concrete: %a" Micheline_helpers.pp_arbitrary_micheline
       mich_storage ;
-    Lwt.return ()
+    return (Ok ())
     >>= fun () ->
     Fmt.kstr get "/chains/main/blocks/head/context/contracts/%s/script" address
     >>= fun script_string ->
@@ -130,7 +137,7 @@ module Node = struct
       |> Micheline_helpers.get_storage_type_exn in
     dbgf ctxt "Storage type: %a" Micheline_helpers.pp_arbitrary_micheline
       mich_storage_type ;
-    Lwt.return ()
+    return (Ok ())
     >>= fun () ->
     let bgs =
       Micheline_helpers.find_metadata_big_maps ~storage_node:mich_storage
@@ -145,12 +152,14 @@ module Node = struct
           |> String.concat ~sep:"" )
     | [metadata_big_map] ->
         return
-          Contract.(
-            make ~metadata_big_map ~storage_node:mich_storage
-              ~type_node:mich_storage_type)
+          (Ok
+             Contract.(
+               make ~metadata_big_map ~storage_node:mich_storage
+                 ~type_node:mich_storage_type) )
 
   let bytes_value_of_big_map_at_string ctxt node ~big_map_id ~key =
     let open Lwt in
+    let ( >>= ) = Lwt_result.bind in
     let hash_string = B58_hashes.b58_script_id_hash_of_michelson_string key in
     Decorate_error.(
       reraise
@@ -170,26 +179,26 @@ module Node = struct
       match Ezjsonm.value_from_string bytes_raw_value with
       | `O [("bytes", `String b)] -> Hex.to_string (`Hex b)
       | _ -> Fmt.failwith "Cannot find bytes in %s" bytes_raw_value in
-    return content
+    return (Ok content)
 
   let micheline_value_of_big_map_at_nat ctxt node ~big_map_id ~key =
-    let open Lwt in
     let hash_string = B58_hashes.b58_script_id_hash_of_michelson_int key in
-    Decorate_error.(
-      reraise
-        Message.(
-          text "Cannot find any value in the big-map"
-          %% inline_code (Z.to_string big_map_id)
-          %% text "at the key" %% int inline_code key %% text "(hash: "
-          % inline_code hash_string % text ").")
-        ~f:(fun () ->
-          Fmt.kstr (rpc_get ctxt node)
-            "/chains/main/blocks/head/context/big_maps/%s/%s"
-            (Z.to_string big_map_id) hash_string ))
-    >>= fun raw_value ->
-    dbgf ctxt "JSON raw value: %s" (ellipsize_string raw_value ~max_length:60) ;
-    let content = Michelson.micheline_of_json raw_value in
-    return content
+    Lwt_result.bind_result
+      Decorate_error.(
+        reraise
+          Message.(
+            text "Cannot find any value in the big-map"
+            %% inline_code (Z.to_string big_map_id)
+            %% text "at the key" %% int inline_code key %% text "(hash: "
+            % inline_code hash_string % text ").")
+          ~f:(fun () ->
+            Fmt.kstr (rpc_get ctxt node)
+              "/chains/main/blocks/head/context/big_maps/%s/%s"
+              (Z.to_string big_map_id) hash_string ))
+      (fun raw_value ->
+        dbgf ctxt "JSON raw value: %s"
+          (ellipsize_string raw_value ~max_length:60) ;
+        Ok (Michelson.micheline_of_json raw_value) )
 end
 
 module Node_list = struct
@@ -248,21 +257,21 @@ let find_node_with_contract ctxt addr =
             (fun () ->
               Fmt.kstr (Node.rpc_get ctxt node)
                 "/chains/main/blocks/head/context/contracts/%s/storage" addr
-              >>= fun _network -> return_true )
+              >>= fun res -> return (Result.is_ok res) )
             (fun exn ->
               dbgf ctxt "exn %S" (Exn.to_string exn) ;
               trace := exn :: !trace ;
               return_false ) )
         ctxt#nodes
-      >>= fun node -> Lwt.return node )
-    (fun _ ->
-      Decorate_error.raise ~trace:(List.rev !trace)
-        Message.(
-          text "Cannot find a node that knows about address" %% inline_code addr)
-      )
+      >>= fun node -> Lwt.return (Ok node) )
+    (fun exn ->
+      Lwt.return
+        (Fmt.kstr Http_client.failure
+           "Cannot find a node that knows about address %s: %a" addr
+           Tezos_error_monad.Error_monad.pp_exn exn ) )
 
 let metadata_value ctxt ~address ~key =
-  let open Lwt in
+  let ( >>= ) = Lwt_result.bind in
   find_node_with_contract ctxt address
   >>= fun node ->
   dbgf ctxt "Found contract with node %S" node.Node.name ;
@@ -273,7 +282,7 @@ let metadata_value ctxt ~address ~key =
   Node.bytes_value_of_big_map_at_string ctxt node ~big_map_id ~key
 
 let call_off_chain_view ctxt ~address ~view ~parameter =
-  let open Lwt in
+  let ( >>= ) = Lwt_result.bind in
   let open Metadata_contents.View.Implementation.Michelson_storage in
   let logf f = Fmt.kstr (fun s -> dbgf ctxt "call_off_chain_view: %s" s) f in
   logf "Calling %s(%a)" address Micheline_helpers.pp_arbitrary_micheline
@@ -386,7 +395,7 @@ let call_off_chain_view ctxt ~address ~view ~parameter =
   logf "Calling `/run_code`: %s"
     ( try Ezjsonm.value_to_string constructed
       with e -> Fmt.failwith "JSON too deep for JS backend: %a" Exn.pp e ) ;
-  Node.rpc_post ctxt node
+  Node.rpc_post ctxt ~node
     ~body:(Ezjsonm.value_to_string constructed)
     ( match protocol_kind with
     | `Edo -> "/chains/main/blocks/head/helpers/scripts/run_code/normalized"
@@ -406,4 +415,4 @@ let call_off_chain_view ctxt ~address ~view ~parameter =
     | other ->
         Fmt.failwith "Result is not (Some _): %a"
           Micheline_helpers.pp_arbitrary_micheline other in
-  return (Ok (actual_result, contract_storage))
+  Lwt.return (Ok (actual_result, contract_storage))

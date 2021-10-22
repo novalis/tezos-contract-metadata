@@ -53,6 +53,7 @@ let validate_address input_value =
 
 let on_uri ctxt uri ~address =
   let open Lwt in
+  let ( >>= ) = Lwt_result.bind in
   catch
     (fun () ->
       Contract_metadata.Uri.fetch ctxt uri ~prefix:"Fetching Metadata "
@@ -68,7 +69,7 @@ let on_uri ctxt uri ~address =
                      ?token_metadata_big_map ~metadata:json_code ) ;
                 Lwt.return ()
                 *)
-      return (warnings, contents)
+      return (Ok (warnings, contents))
   | Error trace ->
       (*
                 raise
@@ -76,13 +77,14 @@ let on_uri ctxt uri ~address =
                      (uri_ok_but_metadata_failure ctxt ~uri ~full_input
                         ~metadata_json:json_code ~error ) )*)
       (*return None *)
-      Fmt.kstr fail_with "Failed to retrieve contract %s %a"
-        (Metadata_uri.to_string_uri uri)
-        Tezos_error_monad.Error_monad.pp_print_error trace
+      return
+        (Fmt.kstr Http_client.failure "Failed to retrieve contract %s %a"
+           (Metadata_uri.to_string_uri uri)
+           Tezos_error_monad.Error_monad.pp_print_error trace )
 
 let fetch_contract_metadata ctxt src =
   let full_input = validate_address src in
-  let open Lwt in
+  let ( >>= ) = Lwt_result.bind in
   match full_input with
   | `KT1 address -> (
       Query_nodes.metadata_value
@@ -92,17 +94,15 @@ let fetch_contract_metadata ctxt src =
       match Metadata_uri.of_uri (Uri.of_string metadata_uri) with
       | Ok uri -> on_uri ctxt uri ~address:(Some address)
       | Error errors ->
-          Fmt.kstr fail_with "Wrong url %s %a" metadata_uri
+          Fmt.kstr Lwt.fail_with "Wrong url %s %a" metadata_uri
             Tezos_error_monad.Error_monad.pp_print_error errors )
   | `Uri (_, uri) ->
       if Contract_metadata.Uri.needs_context_address uri then
         dbgf ctxt "This URI requires a context KT1 address …" ;
       on_uri ctxt uri ~address:None
   | `Error (_address, trace) ->
-      Fmt.kstr fail_with "wrong type: %a"
+      Fmt.kstr Lwt.fail_with "wrong type: %a"
         Tezos_error_monad.Error_monad.pp_print_error trace
-
-let fail_decorated msg = Decorate_error.raise (Message.text msg)
 
 let with_timeout ctxt ~f ~raise =
   let open Lwt.Infix in
@@ -113,7 +113,9 @@ let http_with_timeout ctxt ~method_name http_method uri =
   let open Lwt in
   dbgf ctxt "get uri %S" uri ;
   with_timeout ctxt
-    ~raise:(fun timeout -> Fmt.failwith "HTTP Call timed out: %.3f s" timeout)
+    ~raise:(fun timeout ->
+      return
+        (Fmt.kstr Http_client.failure "HTTP Call timed out: %.3f s" timeout) )
     ~f:(fun () ->
       http_method (Uri.of_string uri)
       >>= fun (resp, body) ->
@@ -123,13 +125,15 @@ let http_with_timeout ctxt ~method_name http_method uri =
       | `OK ->
           dbgf ctxt "response ok %d"
             (resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status) ;
-          return content
+          return (Ok content)
       | _ ->
           let code =
             resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
           dbgf ctxt "response bad %d" code ;
-          Fmt.kstr fail_decorated "Wrong HTTP status from http %s of %s: %d"
-            method_name uri code )
+          return
+            (Fmt.kstr Http_client.failure
+               "Wrong HTTP status from http %s of %s: %d" method_name uri code )
+      )
 
 let show_metadata src format debug =
   let ctxt =
@@ -164,21 +168,27 @@ let show_metadata src format debug =
       method with_log_context new_prefix = {<prefix = new_prefix ^ " " ^ prefix>}
       method log_context = prefix
     end in
-  let open Lwt.Infix in
-  Lwt_main.run
-    ( fetch_contract_metadata ctxt src
-    >>= fun result ->
-    (let _warnings, contents = result in
-     match format with
-     | Text Full ->
-         Metadata_contents.pp Caml.Format.std_formatter contents ;
-         print_endline ""
-     | Text Short ->
-         Metadata_contents.pp_short Caml.Format.std_formatter contents ;
-         print_endline ""
-     | Raw -> () (* fixme *)
-     | Json -> print_endline (Metadata_contents.to_json contents) ) ;
-    Lwt.return 0 )
+  let ( >>= ) = Lwt_result.bind in
+  let result =
+    Lwt_main.run
+      ( fetch_contract_metadata ctxt src
+      >>= fun result ->
+      (let _warnings, contents = result in
+       match format with
+       | Text Full ->
+           Metadata_contents.pp Caml.Format.std_formatter contents ;
+           print_endline ""
+       | Text Short ->
+           Metadata_contents.pp_short Caml.Format.std_formatter contents ;
+           print_endline ""
+       | Raw -> () (* fixme *)
+       | Json -> print_endline (Metadata_contents.to_json contents) ) ;
+      Lwt.return (Ok 0) ) in
+  match result with
+  | Ok num -> num
+  | Error e ->
+      Fmt.pr "%a\n" Http_client.pp_http_error e ;
+      1
 
 (* CLI *)
 let metadata_format =

@@ -92,7 +92,7 @@ module Uri = struct
       | Storage {network= Some network; address; key} ->
           logf "storage %s %a %S" network Fmt.Dump.(option string) address key ;
           Fmt.kstr not_implemented "storage uri with network = %s" network
-      | Hash {kind= `Sha256; value; target} -> (
+      | Hash {kind= `Sha256; value; target} ->
           let expected =
             match Digestif.of_raw_string_opt Digestif.sha256 value with
             | Some s -> s
@@ -102,16 +102,26 @@ module Uri = struct
           logf "sha256: %a" (Digestif.pp Digestif.sha256) expected ;
           resolve target
           >>= fun content ->
-          let obtained = Digestif.digest_string Digestif.sha256 content in
-          logf "hash of content: %a" (Digestif.pp Digestif.sha256) obtained ;
-          match Digestif.unsafe_compare Digestif.sha256 expected obtained with
-          | 0 -> Lwt.return content
-          | _ ->
-              Fmt.failwith "Hash of content %a is different from expected %a"
-                (Digestif.pp Digestif.sha256)
-                obtained
-                (Digestif.pp Digestif.sha256)
-                expected ) in
+          Lwt.return
+            (Result.map
+               ~f:(fun content ->
+                 let obtained = Digestif.digest_string Digestif.sha256 content in
+                 logf "hash of content: %a"
+                   (Digestif.pp Digestif.sha256)
+                   obtained ;
+                 match
+                   Digestif.unsafe_compare Digestif.sha256 expected obtained
+                 with
+                 | 0 -> content
+                 | _ ->
+                     (* fixme use result *)
+                     Fmt.failwith
+                       "Hash of content %a is different from expected %a"
+                       (Digestif.pp Digestif.sha256)
+                       obtained
+                       (Digestif.pp Digestif.sha256)
+                       expected )
+               content ) in
     resolve uri
 end
 

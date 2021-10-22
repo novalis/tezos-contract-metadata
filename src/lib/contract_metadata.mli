@@ -39,7 +39,7 @@ module Uri : sig
     -> < nodes: Query_nodes.Node.t list ; .. > Context.t
     -> Metadata_uri.t
     -> current_contract:string option
-    -> string Lwt.t
+    -> Http_client.result Lwt.t
 
   val needs_context_address : Metadata_uri.t -> bool
 end

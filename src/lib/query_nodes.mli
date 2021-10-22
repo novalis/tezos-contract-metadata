@@ -57,10 +57,15 @@ module Node : sig
     -> t
     -> big_map_id:Z.t
     -> key:int
-    -> (int, string) Tezos_micheline.Micheline.node Lwt.t
+    -> ( (int, string) Tezos_micheline.Micheline.node
+       , Http_client.http_error )
+       Lwt_result.t
 
   val metadata_big_map :
-    < .. > Context.t -> t -> address:string -> Contract.t Lwt.t
+       < .. > Context.t
+    -> t
+    -> address:string
+    -> (Contract.t, Http_client.http_error) Result.t Lwt.t
 end
 
 module Node_list : sig
@@ -70,9 +75,10 @@ module Node_list : sig
 end
 
 val metadata_value :
-  < .. > Context.t -> address:string -> key:string -> string Lwt.t
+  < .. > Context.t -> address:string -> key:string -> Http_client.result Lwt.t
 
-val find_node_with_contract : < .. > Context.t -> string -> Node.t Lwt.t
+val find_node_with_contract :
+  < .. > Context.t -> string -> (Node.t, Http_client.http_error) Result.t Lwt.t
 
 val call_off_chain_view :
      < .. > Context.t
@@ -81,7 +87,7 @@ val call_off_chain_view :
   -> parameter:('a, string) Tezos_micheline.Micheline.node
   -> ( (int, string) Tezos_micheline.Micheline.node
        * (int, string) Tezos_micheline.Micheline.node
-     , 'b )
+     , Http_client.http_error )
      Result.t
      Lwt.t
 

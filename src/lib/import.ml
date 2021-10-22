@@ -28,7 +28,7 @@ open Base
 let dbg out fmt = Fmt.pf out "@[tezos-contract-metadata-debug: %a@]%!\n" fmt ()
 
 let dbgf ctxt fmt =
-  Fmt.(kstr (fun s -> dbg ctxt#formatter (const string (s ^ ctxt#log_context))))
+  Fmt.(kstr (fun s -> dbg ctxt#formatter (const string (ctxt#log_context ^ s))))
     fmt
 
 (** Return a list, elements mapped through ~map, with elements before the last

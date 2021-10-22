@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type http_error = Failure of string
+type result = (string, http_error) Base.Result.t
+
 type t =
-  { get: ?limit_bytes:int -> string -> string Lwt.t
-  ; post: headers:Cohttp.Header.t -> body:string -> string -> string Lwt.t }
+  { get: ?limit_bytes:int -> string -> result Lwt.t
+  ; post: headers:Cohttp.Header.t -> body:string -> string -> result Lwt.t }
+
+val failure : string -> ('a, http_error) Result.t
+val pp_http_error : Format.formatter -> http_error -> unit
