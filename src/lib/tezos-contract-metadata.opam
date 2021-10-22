@@ -12,6 +12,7 @@ depends: [
   "lwt"
   "lwt_ssl"
   "ppx_inline_test"
+  "ppx_expect"
   "cohttp-lwt-unix"
   "tezos-tooling" { with-test }
   "dune" { >= "1.11" }
